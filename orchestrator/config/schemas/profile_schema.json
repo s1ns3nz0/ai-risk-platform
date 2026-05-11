@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["risk_profile"],
+  "properties": {
+    "risk_profile": {
+      "type": "object",
+      "required": ["frameworks", "risk_appetite", "thresholds", "failure_policy"],
+      "properties": {
+        "frameworks": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "risk_appetite": {
+          "type": "string",
+          "enum": ["conservative", "moderate", "aggressive"]
+        },
+        "thresholds": {
+          "type": "object"
+        },
+        "failure_policy": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,150 @@
+{
+  "@version": "2.15.0",
+  "@generated": "Sun, 04 May 2026 09:30:00",
+  "site": [
+    {
+      "@name": "http://127.0.0.1:8080",
+      "@host": "127.0.0.1",
+      "@port": "8080",
+      "@ssl": "false",
+      "alerts": [
+        {
+          "pluginid": "40018",
+          "alertRef": "40018",
+          "alert": "SQL Injection",
+          "name": "SQL Injection",
+          "riskcode": "3",
+          "confidence": "2",
+          "riskdesc": "High (Medium)",
+          "confidencedesc": "Medium",
+          "desc": "SQL injection may be possible.",
+          "instances": [
+            {
+              "uri": "http://127.0.0.1:8080/api/export",
+              "method": "GET",
+              "param": "query",
+              "attack": "ZAP' OR '1'='1' --",
+              "evidence": "SQL syntax error"
+            }
+          ],
+          "count": "1",
+          "solution": "Do not trust client side input. Use parameterized queries.",
+          "otherinfo": "",
+          "reference": "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html",
+          "cweid": "89",
+          "wascid": "19",
+          "sourceid": "1"
+        },
+        {
+          "pluginid": "40012",
+          "alertRef": "40012",
+          "alert": "Cross Site Scripting (Reflected)",
+          "name": "Cross Site Scripting (Reflected)",
+          "riskcode": "3",
+          "confidence": "2",
+          "riskdesc": "High (Medium)",
+          "confidencedesc": "Medium",
+          "desc": "Cross-site Scripting (XSS) is an attack technique.",
+          "instances": [
+            {
+              "uri": "http://127.0.0.1:8080/api/export",
+              "method": "GET",
+              "param": "query",
+              "attack": "<script>alert(1)</script>",
+              "evidence": "<script>alert(1)</script>"
+            }
+          ],
+          "count": "1",
+          "solution": "Validate all input. Encode output.",
+          "cweid": "79",
+          "wascid": "8",
+          "sourceid": "1"
+        },
+        {
+          "pluginid": "10021",
+          "alertRef": "10021",
+          "alert": "X-Content-Type-Options Header Missing",
+          "name": "X-Content-Type-Options Header Missing",
+          "riskcode": "1",
+          "confidence": "2",
+          "riskdesc": "Low (Medium)",
+          "confidencedesc": "Medium",
+          "desc": "The Anti-MIME-Sniffing header X-Content-Type-Options was not set to 'nosniff'.",
+          "instances": [
+            {
+              "uri": "http://127.0.0.1:8080/api/login",
+              "method": "POST",
+              "param": "",
+              "evidence": ""
+            },
+            {
+              "uri": "http://127.0.0.1:8080/api/payment/create",
+              "method": "POST",
+              "param": "",
+              "evidence": ""
+            },
+            {
+              "uri": "http://127.0.0.1:8080/api/payment/confirm",
+              "method": "POST",
+              "param": "",
+              "evidence": ""
+            }
+          ],
+          "count": "3",
+          "solution": "Ensure that the application/web server sets the Content-Type header appropriately.",
+          "cweid": "693",
+          "wascid": "15",
+          "sourceid": "1"
+        },
+        {
+          "pluginid": "10035",
+          "alertRef": "10035",
+          "alert": "Strict-Transport-Security Header Not Set",
+          "name": "Strict-Transport-Security Header Not Set",
+          "riskcode": "1",
+          "confidence": "3",
+          "riskdesc": "Low (High)",
+          "confidencedesc": "High",
+          "desc": "HTTP Strict Transport Security (HSTS) is a web security policy mechanism.",
+          "instances": [
+            {
+              "uri": "http://127.0.0.1:8080/health",
+              "method": "GET",
+              "param": "",
+              "evidence": ""
+            }
+          ],
+          "count": "1",
+          "solution": "Ensure that your web server, application server, load balancer, etc. is configured to enforce HSTS.",
+          "cweid": "319",
+          "wascid": "15",
+          "sourceid": "1"
+        },
+        {
+          "pluginid": "90033",
+          "alertRef": "90033",
+          "alert": "Loosely Scoped Cookie",
+          "name": "Loosely Scoped Cookie",
+          "riskcode": "0",
+          "confidence": "1",
+          "riskdesc": "Informational (Low)",
+          "confidencedesc": "Low",
+          "desc": "Cookies can be scoped by domain or path.",
+          "instances": [
+            {
+              "uri": "http://127.0.0.1:8080/api/login",
+              "method": "POST",
+              "param": "session",
+              "evidence": "session=abc123"
+            }
+          ],
+          "count": "1",
+          "solution": "Always scope cookies to a FQDN.",
+          "cweid": "565",
+          "wascid": "15",
+          "sourceid": "1"
+        }
+      ]
+    }
+  ]
+}

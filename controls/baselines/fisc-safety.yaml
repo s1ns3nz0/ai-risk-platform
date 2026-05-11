@@ -1,0 +1,280 @@
+# FISC Safety Standards Baseline Controls
+# Source: 金融機関等コンピュータシステムの安全対策基準・解説書 (9th/10th Edition)
+# Published by: 金融情報システムセンター (Center for Financial Industry Information Systems)
+# Reference: https://www.fisc.or.jp/
+#
+# FISC item numbers follow the convention:
+#   実N = 実務基準 (Practice Standards) item N
+#   統N = 統制基準 (Control Standards) item N
+#   設N = 設備基準 (Facility Standards) item N
+#   監N = 監査基準 (Audit Standards) item N
+#
+# Only includes items verifiable by automated scanners.
+# Items requiring physical/procedural verification are excluded.
+controls:
+
+  # ──────────────────────────────────────────────────────────
+  # 情報セキュリティ — アクセス制御 (Access Control)
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "FISC-実121"
+      title: "ファイルに対するアクセス制御機能を設けること"
+      framework: "fisc-safety"
+      description: "Establish access control functions for files by setting access ranges and permissions for each user to protect important files."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_1"    # Ensure IAM policies are not applied to individual users
+            - "CKV_AWS_40"   # Ensure IAM policies attached only to groups or roles
+            - "CKV_AWS_61"   # Ensure IAM policy does not grant AssumeRole on all
+            - "CKV_AWS_62"   # Ensure no IAM policies with wildcard principal
+            - "CKV_AWS_46"   # Ensure no IAM policies with admin privileges
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  - control:
+      id: "FISC-実125"
+      title: "本人確認機能を設けること"
+      framework: "fisc-safety"
+      description: "Establish identity verification (authentication) functions. Systems must verify user identity before granting access."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.hardcoded-password.*"
+            - "generic.secrets.security.detected-generic-password.*"
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_273"  # Ensure access through SSO
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  - control:
+      id: "FISC-実127"
+      title: "IDの不正使用防止機能を設けること"
+      framework: "fisc-safety"
+      description: "Establish functions to prevent unauthorized use of IDs. Include measures such as account lockout, multi-factor authentication, and detection of anomalous login patterns."
+      verification_methods:
+        - scanner: sigma
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.hardcoded-password.*"
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # 情報セキュリティ — データ保護・暗号化 (Data Protection / Encryption)
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "FISC-実119"
+      title: "伝送データの漏洩防止策を講ずること"
+      framework: "fisc-safety"
+      description: "Implement measures to prevent leakage of transmitted data. Encrypt transmission data using approved cryptographic methods."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_19"   # Ensure S3 bucket has server-side encryption enabled
+            - "CKV_AWS_145"  # Ensure S3 buckets are encrypted with KMS
+            - "CKV_AWS_21"   # Ensure S3 bucket has versioning enabled
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  - control:
+      id: "FISC-実123"
+      title: "伝送データの改ざん検知策を講ずること"
+      framework: "fisc-safety"
+      description: "Implement measures to detect tampering of transmitted data. Use message authentication codes, digital signatures, or integrity verification mechanisms."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.cryptography.security.*"
+            - "python.lang.security.audit.weak-hashing.*"
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_36"   # Ensure CloudTrail log file validation is enabled
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # 情報セキュリティ — 秘密情報管理 (Secret Management)
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "FISC-実126"
+      title: "生体認証の特性を考慮した安全対策を検討すること"
+      framework: "fisc-safety"
+      description: "Consider safety measures for biometric authentication characteristics. Extended scope: verify that authentication credentials (including biometric templates) are not stored in plaintext or exposed in source code. Partial coverage: detects hardcoded credentials, not biometric-specific controls."
+      verification_methods:
+        - scanner: gitleaks
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.hardcoded-password.*"
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # 情報セキュリティ — ログ・監視 (Logging / Monitoring)
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "FISC-実128"
+      title: "アクセス履歴管理機能を設けること"
+      framework: "fisc-safety"
+      description: "Establish access history management functions. Record and retain logs of all access to systems and data, ensure logs cannot be tampered with."
+      verification_methods:
+        - scanner: sigma
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_18"   # Ensure S3 bucket has access logging enabled
+            - "CKV_AWS_67"   # Ensure CloudTrail is enabled in all regions
+            - "CKV_AWS_150"  # Ensure VPC has flow log enabled
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  - control:
+      id: "FISC-実122"
+      title: "不良データ検出機能を充実すること"
+      framework: "fisc-safety"
+      description: "Enhance defective/malicious data detection functions. Implement input validation, anomaly detection, and data integrity checks."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.injection.*"
+            - "python.lang.security.audit.formatted-sql-query.*"
+        - scanner: sigma
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # 情報セキュリティ — 脆弱性管理 (Vulnerability Management)
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "FISC-実124"
+      title: "ファイル突合機能を設けること"
+      framework: "fisc-safety"
+      description: "Establish file reconciliation/matching functions. Ensure integrity verification of critical system files and detection of unauthorized modifications."
+      verification_methods:
+        - scanner: grype
+          severity_threshold: high
+        - scanner: sbom
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # 統制基準 — ネットワーク管理 (Network Management)
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "FISC-統20"
+      title: "外部ネットワークとの接続に関する安全対策"
+      framework: "fisc-safety"
+      description: "Implement safety measures for connections with external networks. Restrict and monitor traffic between internal and external networks."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_24"   # Ensure no ingress from 0.0.0.0/0 to port 22
+            - "CKV_AWS_25"   # Ensure no ingress from 0.0.0.0/0 to port 3389
+            - "CKV2_AWS_12"  # Ensure default VPC does not exist
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # 実務基準 — 外部委託管理 (Third-Party / Software Supply Chain)
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "FISC-実34"
+      title: "外部接続の運用管理方法を定めること"
+      framework: "fisc-safety"
+      description: "Define operational management methods for external connections. Includes management of third-party software components and supply chain security."
+      verification_methods:
+        - scanner: sbom
+        - scanner: grype
+          severity_threshold: high
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # 実務基準 — 運用管理 (Operations Management)
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "FISC-実37"
+      title: "業務執行体制の明確化"
+      framework: "fisc-safety"
+      description: "Clarify the operation execution system. Define roles, responsibilities, and access privileges for system operations."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_40"   # Ensure IAM policies attached only to groups or roles
+            - "CKV_AWS_79"   # Ensure IMDSv2 is required
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  - control:
+      id: "FISC-実38"
+      title: "オペレーションの記録及び確認"
+      framework: "fisc-safety"
+      description: "Record and confirm all operations. Maintain audit trails of system operations and changes."
+      verification_methods:
+        - scanner: sigma
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_67"   # Ensure CloudTrail is enabled in all regions
+            - "CKV_AWS_36"   # Ensure CloudTrail log file validation is enabled
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required

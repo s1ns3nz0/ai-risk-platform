@@ -1,0 +1,36 @@
+{
+  "catalog": {
+    "uuid": "nested-test-uuid",
+    "metadata": {"title": "Nested Groups Test", "version": "1.0"},
+    "groups": [
+      {
+        "id": "outer",
+        "title": "Outer Group",
+        "groups": [
+          {
+            "id": "inner",
+            "title": "Inner Group",
+            "controls": [
+              {
+                "id": "inner-1",
+                "title": "Inner Control",
+                "parts": [
+                  {"name": "statement", "prose": "A nested control."}
+                ]
+              }
+            ]
+          }
+        ],
+        "controls": [
+          {
+            "id": "outer-1",
+            "title": "Outer Control",
+            "parts": [
+              {"name": "statement", "prose": "An outer control."}
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

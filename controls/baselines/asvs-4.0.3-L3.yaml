@@ -1,0 +1,744 @@
+# OWASP ASVS 4.0.3 Level 3 Baseline Controls
+# Source: OWASP Application Security Verification Standard 4.0.3
+# Reference: https://github.com/OWASP/ASVS/tree/v4.0.3
+# Only includes requirements verifiable by automated scanners.
+# Note: The project label "asvs-4.0.3-L3" in tier-mappings reflects a
+# forward-looking baseline name; real IDs below are from ASVS 4.0.3.
+controls:
+
+  # ──────────────────────────────────────────────────────────
+  # V2: Authentication Verification Requirements
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "ASVS-V2.1.7"
+      title: "Passwords checked against breached password sets"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that passwords submitted during account registration, login, and password change are checked against a set of breached passwords."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.hardcoded-password.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V2.2.1"
+      title: "Anti-automation controls for credential stuffing"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that anti-automation controls are effective at mitigating breached credential testing, brute force, and account lockout attacks."
+      verification_methods:
+        - scanner: sigma
+        - scanner: semgrep
+          rules:
+            - "python.flask.security.audit.rate-limiting.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V2.5.4"
+      title: "No shared or default accounts"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify there are no shared or default accounts present (e.g. root, admin, sa)."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.hardcoded-password.*"
+            - "generic.secrets.security.detected-username.*"
+        - scanner: gitleaks
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V2.10.1"
+      title: "Intra-service secrets not unchanging credentials"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that intra-service secrets do not rely on unchanging credentials such as passwords, API keys, or shared privileged accounts."
+      verification_methods:
+        - scanner: gitleaks
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.hardcoded-password.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V2.10.4"
+      title: "Passwords and API keys not in source code"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify passwords, integrations with databases and third-party systems, seeds and internal secrets, and API keys are managed securely and not included in the source code or stored within source code repositories."
+      verification_methods:
+        - scanner: gitleaks
+        - scanner: semgrep
+          rules:
+            - "generic.secrets.security.detected-*"
+            - "python.lang.security.audit.hardcoded-password.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # V3: Session Management Verification Requirements
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "ASVS-V3.2.3"
+      title: "Session tokens stored using secure methods only"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify the application only stores session tokens in the browser using secure methods such as appropriately secured cookies or HTML5 session storage."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.django.security.audit.secure-cookies.*"
+            - "python.flask.security.audit.set-cookie.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V3.4.1"
+      title: "Cookie-based session tokens have Secure attribute"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that cookie-based session tokens have the 'Secure' attribute set."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.django.security.audit.secure-cookies.*"
+            - "python.flask.security.audit.set-cookie-secure.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V3.4.2"
+      title: "Cookie-based session tokens have HttpOnly attribute"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that cookie-based session tokens have the 'HttpOnly' attribute set."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.django.security.audit.httponly-cookie.*"
+            - "python.flask.security.audit.set-cookie-httponly.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V3.4.3"
+      title: "Cookie-based session tokens use SameSite attribute"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that cookie-based session tokens utilize the 'SameSite' attribute to limit exposure to cross-site request forgery attacks."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.django.security.audit.csrf.*"
+            - "python.flask.security.audit.set-cookie-samesite.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V3.5.1"
+      title: "Application allows users to revoke OAuth tokens"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify the application allows users to revoke OAuth tokens that form trust relationships with linked applications."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.jwt.security.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V3.5.3"
+      title: "Stateless session tokens use digital signatures"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that stateless session tokens use digital signatures, encryption, and other countermeasures to protect against tampering, enveloping, replay, null cipher, and key substitution attacks."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.jwt.security.jwt-decode-verify.*"
+            - "python.jwt.security.unverified-jwt-decode.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # V5: Validation, Sanitization and Encoding
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "ASVS-V5.1.3"
+      title: "All input validated using positive validation"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that all input (HTML form fields, REST requests, URL parameters, HTTP headers, cookies, batch files, RSS feeds) is validated using positive validation (allow lists)."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.injection.*"
+            - "python.flask.security.injection.*"
+        - scanner: zap
+          rules:
+            - "ZAP-40018"
+            - "ZAP-40012"
+            - "ZAP-40014"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V5.2.4"
+      title: "Avoidance of eval() or dynamic code execution"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that the application avoids the use of eval() or other dynamic code execution features. Where there is no alternative, any user input being included must be sanitized or sandboxed."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.eval-used.*"
+            - "python.lang.security.audit.exec-used.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V5.2.5"
+      title: "Protection against template injection attacks"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that the application protects against template injection attacks by ensuring that any user input being included is sanitized or sandboxed."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.flask.security.injection.taint.*"
+            - "python.jinja2.security.audit.autoescape-disabled.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V5.2.6"
+      title: "Protection against SSRF attacks"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that the application protects against SSRF attacks, by validating or sanitizing untrusted data or HTTP file metadata."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.flask.security.injection.ssrf-requests.*"
+            - "python.requests.security.no-auth-over-http.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V5.3.3"
+      title: "Context-aware output escaping protects against XSS"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that context-aware, preferably automated, output escaping protects against reflected, stored, and DOM based XSS."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.django.security.audit.xss.*"
+            - "python.flask.security.audit.render-template-string.*"
+            - "python.jinja2.security.audit.autoescape-disabled.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V5.3.4"
+      title: "Database queries use parameterized queries"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that data selection or database queries use parameterized queries, ORMs, entity frameworks, or are otherwise protected from database injection attacks."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.injection.*sql*"
+            - "python.lang.security.audit.formatted-sql-query.*"
+            - "python.django.security.injection.sql.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V5.3.7"
+      title: "Protection against LDAP injection"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that the application protects against LDAP injection vulnerabilities, or that specific security controls to prevent LDAP injection have been implemented."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.injection.ldap.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V5.3.8"
+      title: "Protection against OS command injection"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that the application protects against OS command injection and that operating system calls use parameterized OS queries or use contextual command line output encoding."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.subprocess-shell-true.*"
+            - "python.lang.security.injection.os-system.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V5.3.10"
+      title: "Protection against XPath or XML injection"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that the application protects against XPath injection or XML injection attacks."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.xml.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V5.5.2"
+      title: "XML parsers use safest possible configuration"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that the application correctly restricts XML parsers to only use the most restrictive configuration possible and to ensure that unsafe features such as resolving external entities are disabled."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.xml.xxe.*"
+            - "python.lang.security.xml-external-entities.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V5.5.3"
+      title: "Deserialization of untrusted data avoided or protected"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that deserialization of untrusted data is avoided or is protected in both custom code and third-party libraries."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.pickle.*"
+            - "python.lang.security.deserialization.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # V6: Stored Cryptography Verification Requirements
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "ASVS-V6.1.1"
+      title: "Regulated private data encrypted at rest"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that regulated private data is stored encrypted while at rest, such as Personally Identifiable Information (PII), sensitive personal information."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_19"   # Ensure S3 bucket has server-side encryption
+            - "CKV_AWS_145"  # Ensure S3 buckets encrypted with KMS
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V6.2.1"
+      title: "Cryptographic modules fail securely"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that all cryptographic modules fail securely, and errors are handled in a way that does not enable Padding Oracle attacks."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.cryptography.security.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V6.2.2"
+      title: "Industry-proven cryptographic algorithms used"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that industry proven or government approved cryptographic algorithms, modes, and libraries are used, instead of custom coded cryptography."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.cryptography.security.insecure-cipher-algorithm.*"
+            - "python.lang.security.audit.weak-hashing.*"
+            - "python.cryptography.security.insecure-key-size.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V6.2.5"
+      title: "Insecure block modes and weak algorithms not used"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that known insecure block modes (i.e., ECB, etc.), padding modes, ciphers with small block sizes (i.e., Triple-DES, Blowfish, etc.), and weak hashing algorithms (i.e., MD5, SHA1, etc.) are not used."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.cryptography.security.insecure-cipher-mode.*"
+            - "python.lang.security.audit.weak-hashing.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V6.3.1"
+      title: "All random values generated using CSPRNG"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that all random numbers, random file names, random GUIDs, and random strings are generated using the cryptographic module's approved cryptographically secure random number generator."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.insecure-random.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V6.4.1"
+      title: "Secrets management solution used for key management"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that a secrets management solution such as a key vault is used to securely create, store, control access to and destroy secrets."
+      verification_methods:
+        - scanner: gitleaks
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_33"   # Ensure KMS key policy does not contain wildcard
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # V8: Data Protection Verification Requirements
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "ASVS-V8.2.1"
+      title: "Anti-caching headers set for sensitive data"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify the application sets sufficient anti-caching headers so that sensitive data is not cached in modern browsers."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.django.security.audit.cache-control.*"
+            - "python.flask.security.audit.cache-control.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V8.3.1"
+      title: "Sensitive data sent in HTTP message body, not query strings"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that sensitive data is sent to the server in the HTTP message body or headers, and that query string parameters from any HTTP verb do not contain sensitive data."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.logging.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V8.3.4"
+      title: "All sensitive data identified and classified"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that all sensitive data created and processed by the application has been identified, and ensure that a policy is in place on how to deal with sensitive data."
+      verification_methods:
+        - scanner: gitleaks
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.logging.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # V10: Malicious Code Verification Requirements
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "ASVS-V10.1.1"
+      title: "Code analysis tool detects potentially malicious code"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that a code analysis tool is in use that can detect potentially malicious code, such as time functions, unsafe file operations, and suspicious network connections."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.*"
+        - scanner: grype
+          severity_threshold: critical
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V10.2.1"
+      title: "Source code does not contain unauthorized data collection"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify the application source code does not contain any unauthorized phone home or data harvesting capabilities."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.network-call.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V10.3.2"
+      title: "Application employs integrity protections"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that the application employs integrity protections, such as code signing or subresource integrity."
+      verification_methods:
+        - scanner: sbom
+        - scanner: grype
+          severity_threshold: high
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # V14: Configuration Verification Requirements
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "ASVS-V14.1.1"
+      title: "Build and deployment processes secure and repeatable"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that the application build and deployment processes are performed in a secure and repeatable way, such as CI/CD automation, automated configuration management."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_79"   # Ensure IMDSv2 is required
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V14.2.1"
+      title: "All components up to date"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that all components are up to date, preferably using a dependency checker during build or compile time."
+      verification_methods:
+        - scanner: grype
+          severity_threshold: high
+        - scanner: sbom
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V14.2.2"
+      title: "Unneeded features, documentation, and samples removed"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that all unneeded features, documentation, sample applications and configurations are removed."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV2_AWS_12"  # Ensure default VPC does not exist
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V14.2.5"
+      title: "Software Bill of Materials maintained"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that a Software Bill of Materials (SBOM) is maintained of all third party libraries in use."
+      verification_methods:
+        - scanner: sbom
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V14.3.2"
+      title: "Debug modes disabled in production"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that web or application server and application framework debug modes are disabled in production to eliminate debug features, developer consoles, and unintended security disclosures."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.django.security.audit.debug-enabled.*"
+            - "python.flask.security.audit.debug-enabled.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V14.4.3"
+      title: "Content Security Policy response header in place"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that a Content Security Policy (CSP) response header is in place that helps mitigate impact of XSS attacks."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.django.security.audit.csp.*"
+            - "generic.html-templates.security.missing-csp.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V14.4.5"
+      title: "Strict-Transport-Security header included"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that a Strict-Transport-Security header is included on all responses and for all subdomains."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.django.security.audit.hsts.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "ASVS-V14.5.3"
+      title: "CORS Access-Control-Allow-Origin uses strict allow list"
+      framework: "asvs-4.0.3-L3"
+      description: "Verify that the Cross-Origin Resource Sharing (CORS) Access-Control-Allow-Origin header uses a strict allow list of trusted domains and subdomains to match against and does not support the null origin."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.django.security.audit.cors.*"
+            - "python.flask.security.audit.cors.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required

@@ -1,0 +1,103 @@
+# Asset Register — payment-api
+# SP 800-30 asset/impact-oriented analysis complement
+# Grouped by business function (ISO 27005 + SP 800-30 Section 2.3.3)
+
+assets:
+  - id: AST-001
+    name: Payment Processing
+    description: Core transaction processing logic handling payment authorization, capture, and settlement
+    owner: Backend Team
+    components:
+      - eks-payment-pods
+      - lambda-payment-auth
+    data_types:
+      - PCI
+      - PII
+    cia:
+      confidentiality: high
+      integrity: high
+      availability: high
+    sla: "99.95% uptime, <200ms p99 latency"
+    revenue_impact: "$2,400/minute downtime"
+    threat_events:
+      - TE-001
+      - TE-004
+
+  - id: AST-002
+    name: Data Storage
+    description: Persistent storage for cardholder data, transaction records, and customer PII
+    owner: Cloud Infra
+    components:
+      - rds-postgresql
+      - s3-backup-bucket
+      - dynamodb-session-store
+    data_types:
+      - PCI
+      - PII
+    cia:
+      confidentiality: high
+      integrity: high
+      availability: moderate
+    sla: "RPO <1 minute, RTO <5 minutes"
+    revenue_impact: "Regulatory notification required under APPI/GDPR on breach"
+    threat_events:
+      - TE-001
+      - TE-003
+      - TE-006
+
+  - id: AST-003
+    name: API Boundary
+    description: Public-facing API gateway and load balancer serving external payment integrations
+    owner: Platform Team
+    components:
+      - api-gateway
+      - alb-public
+    data_types:
+      - PCI
+    cia:
+      confidentiality: moderate
+      integrity: moderate
+      availability: high
+    sla: "99.99% availability, <50ms gateway latency"
+    revenue_impact: "Payment integration partners affected on outage"
+    threat_events:
+      - TE-001
+      - TE-005
+
+  - id: AST-004
+    name: Credential Management
+    description: API keys, database connection strings, and service account tokens
+    owner: DevOps
+    components:
+      - docker-image-layers
+      - env-variables
+      - secrets-manager
+    data_types:
+      - credentials
+    cia:
+      confidentiality: high
+      integrity: high
+      availability: low
+    sla: "Rotation within 24h of compromise detection"
+    revenue_impact: "Lateral movement to all connected services on credential leak"
+    threat_events:
+      - TE-002
+
+  - id: AST-005
+    name: Infrastructure
+    description: Cloud IAM policies, VPC networking, and service mesh configuration
+    owner: Cloud Infra
+    components:
+      - iam-roles
+      - vpc-networking
+      - service-mesh
+    data_types: []
+    cia:
+      confidentiality: low
+      integrity: moderate
+      availability: moderate
+    sla: "Infrastructure changes reviewed within 1 business day"
+    revenue_impact: "Misconfiguration enables privilege escalation across all assets"
+    threat_events:
+      - TE-003
+      - TE-005

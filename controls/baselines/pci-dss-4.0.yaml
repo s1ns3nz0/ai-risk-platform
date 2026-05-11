@@ -1,0 +1,851 @@
+# PCI DSS 4.0 Baseline Controls
+# Source: PCI DSS v4.0 (March 2022), PCI Security Standards Council
+# Only includes requirements verifiable by automated scanners.
+# Reference: https://www.pcisecuritystandards.org
+controls:
+
+  # ──────────────────────────────────────────────────────────
+  # Requirement 1: Install and Maintain Network Security Controls
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "PCI-DSS-1.2.1"
+      title: "Configuration standards for NSC rulesets are defined and maintained"
+      framework: "pci-dss-4.0"
+      description: "Configuration standards for network security control (NSC) rulesets are defined, implemented, and maintained."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_23"   # Ensure every security group rule has a description
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-1.3.1"
+      title: "Inbound traffic to the CDE is restricted"
+      framework: "pci-dss-4.0"
+      description: "Inbound traffic to the CDE is restricted to only that which is necessary, and all other traffic is specifically denied."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_24"   # Ensure no security group allows ingress from 0.0.0.0/0 to port 22
+            - "CKV_AWS_25"   # Ensure no security group allows ingress from 0.0.0.0/0 to port 3389
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-1.3.2"
+      title: "Outbound traffic from the CDE is restricted"
+      framework: "pci-dss-4.0"
+      description: "Outbound traffic from the CDE is restricted to only that which is necessary, and all other traffic is specifically denied."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_382"  # Ensure no default security group allows all outbound traffic
+            - "CKV2_AWS_5"   # Ensure security groups are attached to resources
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-1.4.1"
+      title: "NSCs implemented between trusted and untrusted networks"
+      framework: "pci-dss-4.0"
+      description: "NSCs are implemented between trusted and untrusted networks to control traffic at the perimeter."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_150"  # Ensure VPC has flow log enabled
+            - "CKV2_AWS_12"  # Ensure default VPC does not exist
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-1.4.4"
+      title: "System components storing CHD not directly accessible from untrusted networks"
+      framework: "pci-dss-4.0"
+      description: "System components that store cardholder data are not directly accessible from untrusted networks."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_17"   # Ensure RDS instance is not publicly accessible
+            - "CKV_AWS_88"   # Ensure Redshift cluster is not publicly accessible
+            - "CKV_AWS_86"   # Ensure Elasticsearch domain is not publicly accessible
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # Requirement 2: Apply Secure Configurations
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "PCI-DSS-2.2.1"
+      title: "System configuration standards developed and implemented"
+      framework: "pci-dss-4.0"
+      description: "Configuration standards are developed, implemented, and maintained for all system components covering all known security vulnerabilities and are consistent with industry-accepted system hardening standards."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_79"   # Ensure Instance Metadata Service Version 1 is not enabled
+            - "CKV_AWS_8"    # Ensure launch configuration is not configured with a public IP
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-2.2.2"
+      title: "Vendor default accounts managed"
+      framework: "pci-dss-4.0"
+      description: "Vendor default accounts are managed; default passwords are changed per Requirement 8.3.6 if the accounts will be used, or the accounts are removed or disabled."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.hardcoded-password.*"
+            - "generic.secrets.security.detected-generic-password.*"
+        - scanner: gitleaks
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-2.2.5"
+      title: "Insecure services and protocols not permitted"
+      framework: "pci-dss-4.0"
+      description: "If any insecure services, protocols, or daemons are present, business justification is documented, and additional security features are documented and implemented."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_260"  # Ensure no security group allows ingress from 0.0.0.0/0 to port 80
+            - "CKV_AWS_23"   # Ensure every security group rule has a description
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-2.2.7"
+      title: "Non-console administrative access encrypted"
+      framework: "pci-dss-4.0"
+      description: "All non-console administrative access is encrypted using strong cryptography."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_2"    # Ensure ALB protocol is HTTPS
+            - "CKV_AWS_70"   # Ensure Sagemaker endpoint uses HTTPS
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.ssl.*"
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  # ��───────────────────────────��─────────────────────────────
+  # Requirement 3: Protect Stored Account Data
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "PCI-DSS-3.4.1"
+      title: "PAN masked when displayed"
+      framework: "pci-dss-4.0"
+      description: "PAN is masked when displayed such that only personnel with a legitimate business need can see more than the BIN and last four digits. Partial coverage: detects logging of sensitive data patterns."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.logging.*"
+            - "python.lang.security.audit.formatted-sql-query.*"
+            # Partial: detects PII in logs, not full PAN masking verification
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-3.5.1"
+      title: "PAN is rendered unreadable anywhere it is stored"
+      framework: "pci-dss-4.0"
+      description: "PAN is rendered unreadable anywhere it is stored by using strong cryptography."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_19"   # Ensure S3 bucket has server-side encryption enabled
+            - "CKV_AWS_145"  # Ensure S3 buckets are encrypted with KMS
+            - "CKV_AWS_17"   # Ensure RDS instance is not publicly accessible
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-3.5.1.1"
+      title: "Keyed cryptographic hashes used for PAN hashing"
+      framework: "pci-dss-4.0"
+      description: "Hashes used to render PAN unreadable are keyed cryptographic hashes of the entire PAN, with associated key management processes."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.cryptography.security.*"
+            - "python.lang.security.audit.weak-hashing.*"
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-3.6.1"
+      title: "Cryptographic key management procedures defined"
+      framework: "pci-dss-4.0"
+      description: "Procedures for protecting cryptographic keys used to protect stored account data against disclosure and misuse are defined and implemented."
+      verification_methods:
+        - scanner: gitleaks
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_33"   # Ensure KMS key policy does not contain wildcard principals
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-3.7.1"
+      title: "Key-management policies and procedures include key generation"
+      framework: "pci-dss-4.0"
+      description: "Key management policies and procedures are implemented to include generation of strong cryptographic keys."
+      verification_methods:
+        - scanner: gitleaks
+        - scanner: semgrep
+          rules:
+            - "python.cryptography.security.insecure-key-size.*"
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  # ─────────���───────────────────��────────────────────────────
+  # Requirement 5: Protect All Systems and Networks from Malicious Software
+  # ─────────────────��────────────────────────────────────────
+
+  - control:
+      id: "PCI-DSS-5.2.1"
+      title: "Anti-malware solution deployed on all system components"
+      framework: "pci-dss-4.0"
+      description: "An anti-malware solution is deployed on all system components, except for those identified as not at risk per Requirement 5.2.3."
+      verification_methods:
+        - scanner: grype
+          severity_threshold: critical
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-5.2.2"
+      title: "Anti-malware detects all known types of malware"
+      framework: "pci-dss-4.0"
+      description: "The deployed anti-malware solution(s) detect all known types of malware and remove, block, or contain all known types of malware."
+      verification_methods:
+        - scanner: grype
+          severity_threshold: high
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.exec-used.*"
+            - "python.lang.security.audit.eval-used.*"
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-5.3.2"
+      title: "Anti-malware solution performs periodic scans and active scans"
+      framework: "pci-dss-4.0"
+      description: "The anti-malware solution performs periodic scans and active or real-time scans, or continuous behavioral analysis of systems or processes."
+      verification_methods:
+        - scanner: grype
+          severity_threshold: high
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-5.4.1"
+      title: "Anti-phishing mechanisms protect against phishing attacks"
+      framework: "pci-dss-4.0"
+      description: "Processes and automated mechanisms to detect and protect personnel against phishing attacks are in place."
+      verification_methods:
+        - scanner: sigma
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  # ──────��───────────────────────────────────────────────────
+  # Requirement 6: Develop and Maintain Secure Systems and Software
+  # ──────��──────────���────────────────────────────────────────
+
+  - control:
+      id: "PCI-DSS-6.2.1"
+      title: "Bespoke and custom software developed securely"
+      framework: "pci-dss-4.0"
+      description: "Bespoke and custom software are developed securely, based on industry standards and best practices for secure development."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.*"
+            - "python.django.security.*"
+            - "python.flask.security.*"
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: recommended
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-6.2.3"
+      title: "Custom software reviewed prior to release"
+      framework: "pci-dss-4.0"
+      description: "Bespoke and custom software is reviewed prior to being released into production or to customers, to identify and correct potential coding vulnerabilities."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.injection.*"
+            - "python.lang.security.audit.*"
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: recommended
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-6.2.4"
+      title: "Software engineering techniques prevent common attacks"
+      framework: "pci-dss-4.0"
+      description: "Software engineering techniques or other methods are defined and in use to prevent or mitigate common software attacks including injection, buffer overflow, insecure cryptographic storage."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.injection.*"
+            - "python.lang.security.audit.hardcoded-password.*"
+            - "python.lang.security.audit.formatted-sql-query.*"
+            - "python.django.security.injection.*"
+            - "python.flask.security.injection.*"
+        - scanner: zap
+          rules:
+            - "ZAP-40012"    # Cross Site Scripting (Reflected)
+            - "ZAP-40014"    # Cross Site Scripting (Persistent)
+            - "ZAP-40018"    # SQL Injection
+            - "ZAP-40019"    # SQL Injection (MySQL)
+            - "ZAP-40020"    # SQL Injection (Hypersonic)
+            - "ZAP-40021"    # SQL Injection (Oracle)
+            - "ZAP-40022"    # SQL Injection (PostgreSQL)
+            - "ZAP-90021"    # XPath Injection
+            - "ZAP-40003"    # CRLF Injection
+            - "ZAP-40008"    # Parameter Tampering
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: recommended
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-6.3.1"
+      title: "Security vulnerabilities identified and managed"
+      framework: "pci-dss-4.0"
+      description: "Security vulnerabilities are identified and managed using reputable outside sources for security vulnerability information and assigned a risk ranking."
+      verification_methods:
+        - scanner: grype
+          severity_threshold: high
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.*"
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: recommended
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-6.3.2"
+      title: "Inventory of bespoke and custom software maintained"
+      framework: "pci-dss-4.0"
+      description: "An inventory of bespoke and custom software, and third-party software components incorporated into bespoke and custom software, is maintained to facilitate vulnerability and patch management."
+      verification_methods:
+        - scanner: sbom
+        - scanner: grype
+          severity_threshold: high
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: recommended
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-6.3.3"
+      title: "Software components protected from known vulnerabilities via patching"
+      framework: "pci-dss-4.0"
+      description: "All system components are protected from known vulnerabilities by installing applicable security patches/updates."
+      verification_methods:
+        - scanner: grype
+          severity_threshold: high
+        - scanner: sbom
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: recommended
+        high: required
+        critical: required
+
+  # ──��───────────────────────────────────────────────────────
+  # Requirement 7: Restrict Access to System Components and CHD by Business Need
+  # ────────────────���─────────────────────────────────────────
+
+  - control:
+      id: "PCI-DSS-7.2.1"
+      title: "Access control model defined to cover all system components"
+      framework: "pci-dss-4.0"
+      description: "An access control model is defined and includes granting access based on job classification and function, least privileges, and default deny-all."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_40"   # Ensure IAM policies are attached only to groups or roles
+            - "CKV_AWS_1"    # Ensure IAM policies are not applied to individual users
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-7.2.2"
+      title: "Access assigned to users based on job classification and function"
+      framework: "pci-dss-4.0"
+      description: "Access is assigned to users, including privileged users, based on job classification and function."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_61"   # Ensure IAM policy does not grant AssumeRole on all resources
+            - "CKV_AWS_62"   # Ensure IAM policies do not allow * principal
+            - "CKV_AWS_46"   # Ensure no IAM policies with admin privileges
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-7.2.5"
+      title: "Access privileges assigned and managed via access control systems"
+      framework: "pci-dss-4.0"
+      description: "All application and system accounts and related access privileges are assigned and managed via access control systems."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_40"   # Ensure IAM policies attached only to groups or roles
+            - "CKV_AWS_273"  # Ensure access is managed through SSO
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  # ───────────────────────────────���──────────────────────────
+  # Requirement 8: Identify Users and Authenticate Access
+  # ────────────────────────────��──────────────────────────��──
+
+  - control:
+      id: "PCI-DSS-8.2.1"
+      title: "All users assigned a unique ID before accessing system components"
+      framework: "pci-dss-4.0"
+      description: "All users are assigned a unique ID before access to system components or cardholder data is allowed."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_40"   # Ensure IAM policies attached only to groups or roles
+            - "CKV_AWS_273"  # Ensure access through SSO
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-8.3.1"
+      title: "All user access authenticated with at least one authentication factor"
+      framework: "pci-dss-4.0"
+      description: "All user access to system components for users and administrators is authenticated via at least one of: something you know, something you have, or something you are."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_273"  # Ensure access is through SSO/MFA
+            - "CKV_AWS_46"   # Ensure no IAM policies with admin privileges
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.hardcoded-password.*"
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-8.3.6"
+      title: "Minimum password length of 12 characters"
+      framework: "pci-dss-4.0"
+      description: "If passwords/passphrases are used as an authentication factor, they are set with a minimum length of at least 12 characters."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.hardcoded-password.*"
+            - "generic.secrets.security.detected-generic-password.*"
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-8.6.1"
+      title: "Interactive login for system/application accounts managed"
+      framework: "pci-dss-4.0"
+      description: "If accounts used by systems or applications can be used for interactive login, they are managed as follows: interactive use is prevented unless needed for an exceptional circumstance."
+      verification_methods:
+        - scanner: gitleaks
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.hardcoded-password.*"
+            - "generic.secrets.security.detected-generic-password.*"
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-8.6.2"
+      title: "Passwords not hard-coded into scripts or files"
+      framework: "pci-dss-4.0"
+      description: "Passwords/passphrases for any application and system accounts that can be used for interactive login are not hard coded into scripts, configuration/property files, or bespoke and custom source code."
+      verification_methods:
+        - scanner: gitleaks
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.hardcoded-password.*"
+            - "generic.secrets.security.detected-*"
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: recommended
+        high: required
+        critical: required
+
+  # ─────���────────────────────────────���───────────────────────
+  # Requirement 10: Log and Monitor All Access to System Components and CHD
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "PCI-DSS-10.2.1"
+      title: "Audit logs enabled and active for all system components"
+      framework: "pci-dss-4.0"
+      description: "Audit logs are enabled and active for all system components."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_18"   # Ensure S3 bucket has access logging enabled
+            - "CKV_AWS_150"  # Ensure VPC has flow log enabled
+        - scanner: sigma
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-10.2.1.1"
+      title: "Audit logs capture all individual user access to CHD"
+      framework: "pci-dss-4.0"
+      description: "Audit logs capture all individual user access to cardholder data."
+      verification_methods:
+        - scanner: sigma
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-10.2.1.2"
+      title: "Audit logs capture all actions taken by any individual with administrative access"
+      framework: "pci-dss-4.0"
+      description: "Audit logs capture all actions taken by any individual with administrative access, including any interactive use of application or system accounts."
+      verification_methods:
+        - scanner: sigma
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_67"   # Ensure CloudTrail is enabled in all regions
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-10.2.1.4"
+      title: "Audit logs capture all invalid logical access attempts"
+      framework: "pci-dss-4.0"
+      description: "Audit logs capture all invalid logical access attempts."
+      verification_methods:
+        - scanner: sigma
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-10.2.1.5"
+      title: "Audit logs capture all changes to credentials and authentication"
+      framework: "pci-dss-4.0"
+      description: "Audit logs capture all changes to identification and authentication credentials including creation of new accounts and elevation of privileges."
+      verification_methods:
+        - scanner: sigma
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-10.3.3"
+      title: "Audit log files promptly backed up to secure location"
+      framework: "pci-dss-4.0"
+      description: "Audit log files, including those for external-facing technologies, are promptly backed up to a secure, central, internal log server(s) or other media that is difficult to modify."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_35"   # Ensure CloudTrail logs are encrypted at rest using KMS CMKs
+            - "CKV_AWS_67"   # Ensure CloudTrail is enabled in all regions
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-10.3.4"
+      title: "File integrity monitoring on audit logs"
+      framework: "pci-dss-4.0"
+      description: "File integrity monitoring or change-detection mechanisms is used on audit logs to ensure existing log data cannot be changed without generating alerts."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_36"   # Ensure CloudTrail log file validation is enabled
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-10.4.1"
+      title: "Automated audit log review mechanisms"
+      framework: "pci-dss-4.0"
+      description: "Automated mechanisms perform audit log reviews."
+      verification_methods:
+        - scanner: sigma
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-10.5.1"
+      title: "Retain audit log history for at least 12 months"
+      framework: "pci-dss-4.0"
+      description: "Retain audit log history for at least 12 months, with at least the most recent three months immediately available for analysis. Partial coverage: verifies logging is enabled, not retention period."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_67"   # Ensure CloudTrail is enabled in all regions
+            - "CKV_AWS_35"   # Ensure CloudTrail logs are encrypted
+            # Partial: verifies logging enabled, not 12-month retention config
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  # ──��────────────────────────────���──────────────────────────
+  # Requirement 11: Test Security of Systems and Networks Regularly
+  # ───────────────────────────────────────────────────────��──
+
+  - control:
+      id: "PCI-DSS-11.3.1"
+      title: "Internal vulnerability scans performed at least quarterly"
+      framework: "pci-dss-4.0"
+      description: "Internal vulnerability scans are performed at least once every three months, and high-risk and critical vulnerabilities are resolved."
+      verification_methods:
+        - scanner: grype
+          severity_threshold: high
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.*"
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-11.3.1.1"
+      title: "All other applicable vulnerabilities managed"
+      framework: "pci-dss-4.0"
+      description: "All other applicable vulnerabilities not ranked as high-risk or critical are managed per targeted risk analysis."
+      verification_methods:
+        - scanner: grype
+          severity_threshold: medium
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-11.3.2"
+      title: "External vulnerability scans performed at least quarterly"
+      framework: "pci-dss-4.0"
+      description: "External vulnerability scans are performed at least once every three months by a PCI SSC Approved Scanning Vendor (ASV)."
+      verification_methods:
+        - scanner: grype
+          severity_threshold: high
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-11.5.2"
+      title: "Change-detection mechanism deployed to alert on unauthorized modification"
+      framework: "pci-dss-4.0"
+      description: "A change-detection mechanism (for example, file integrity monitoring tools) is deployed to alert personnel to unauthorized modification of critical system files, configuration files, or content files."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_36"   # Ensure CloudTrail log file validation is enabled
+        - scanner: sigma
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  - control:
+      id: "PCI-DSS-11.6.1"
+      title: "Change- and tamper-detection mechanism deployed on payment pages"
+      framework: "pci-dss-4.0"
+      description: "A change- and tamper-detection mechanism is deployed to alert personnel to unauthorized modification of HTTP headers and content of payment pages."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "javascript.browser.security.insufficient-csp.*"
+            - "html.security.missing-csp.*"
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  # ───────────────────────────���──────────────────────────────
+  # Requirement 12: Support Information Security with Organizational Policies
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "PCI-DSS-12.3.4"
+      title: "Hardware and software technologies reviewed annually"
+      framework: "pci-dss-4.0"
+      description: "Hardware and software technologies in use are reviewed at least once every 12 months to confirm they continue to receive security fixes and are supported."
+      verification_methods:
+        - scanner: sbom
+        - scanner: grype
+          severity_threshold: high
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required

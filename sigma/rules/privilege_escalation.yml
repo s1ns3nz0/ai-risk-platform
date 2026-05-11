@@ -1,0 +1,19 @@
+title: Privilege Escalation Attempt
+id: privesc-001
+status: stable
+level: high
+description: Detects role changes or unauthorized admin access
+logsource:
+  category: application
+  product: payment-api
+detection:
+  role_change:
+    event_type: role_change
+  admin_access:
+    event_type: admin_access
+  condition: role_change or admin_access
+tags:
+  - attack.t1078
+  - attack.privilege_escalation
+control_ids:
+  - FISC-実121

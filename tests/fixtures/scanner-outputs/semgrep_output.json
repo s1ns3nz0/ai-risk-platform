@@ -1,0 +1,69 @@
+{
+  "results": [
+    {
+      "check_id": "python.lang.security.injection.sql-injection",
+      "path": "src/api/export.py",
+      "start": {
+        "line": 42,
+        "col": 5
+      },
+      "end": {
+        "line": 42,
+        "col": 60
+      },
+      "extra": {
+        "message": "Possible SQL injection via string concatenation with user input",
+        "severity": "ERROR",
+        "metadata": {
+          "confidence": "HIGH",
+          "impact": "HIGH",
+          "likelihood": "HIGH"
+        }
+      }
+    },
+    {
+      "check_id": "python.lang.security.audit.hardcoded-password.hardcoded-password-default-arg",
+      "path": "src/config.py",
+      "start": {
+        "line": 15,
+        "col": 1
+      },
+      "end": {
+        "line": 15,
+        "col": 45
+      },
+      "extra": {
+        "message": "Hardcoded password detected as default argument",
+        "severity": "WARNING",
+        "metadata": {
+          "confidence": "MEDIUM",
+          "impact": "MEDIUM",
+          "likelihood": "MEDIUM"
+        }
+      }
+    },
+    {
+      "check_id": "python.jwt.security.jwt-decode-without-verification",
+      "path": "src/auth/jwt_handler.py",
+      "start": {
+        "line": 28,
+        "col": 10
+      },
+      "end": {
+        "line": 28,
+        "col": 55
+      },
+      "extra": {
+        "message": "JWT decoded without signature verification",
+        "severity": "ERROR",
+        "metadata": {
+          "confidence": "HIGH",
+          "impact": "HIGH",
+          "likelihood": "MEDIUM"
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "version": "1.67.0"
+}

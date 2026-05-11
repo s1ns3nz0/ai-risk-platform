@@ -1,0 +1,13 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"tier\": \"critical\", \"reasoning\": \"Product handles PCI cardholder data in Japanese jurisdiction, subject to FISC safety guidelines. Multiple threat vectors applicable including web application exploitation (T1190) and credential abuse (T1078).\", \"threat_profile\": [\"T1190\", \"T1078\", \"T1059\"]}"
+    }
+  ],
+  "stop_reason": "end_turn",
+  "usage": {
+    "input_tokens": 320,
+    "output_tokens": 85
+  }
+}

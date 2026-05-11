@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["product"],
+  "properties": {
+    "product": {
+      "type": "object",
+      "required": ["name", "description", "data_classification", "jurisdiction"],
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "data_classification": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "jurisdiction": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "deployment": {
+          "type": "object",
+          "properties": {
+            "cloud": { "type": "string" },
+            "region": { "type": "string" },
+            "compute": { "oneOf": [{"type": "string"}, {"type": "array", "items": {"type": "object"}}] },
+            "databases": { "type": "array", "items": { "type": "object" } },
+            "storage": { "type": "array", "items": { "type": "object" } },
+            "networking": { "type": "array", "items": { "type": "object" } },
+            "messaging": { "type": "array", "items": { "type": "object" } },
+            "observability": { "type": "array", "items": { "type": "object" } }
+          }
+        },
+        "impact_levels": {
+          "type": "object",
+          "properties": {
+            "confidentiality": { "type": "string", "enum": ["low", "moderate", "high"] },
+            "integrity": { "type": "string", "enum": ["low", "moderate", "high"] },
+            "availability": { "type": "string", "enum": ["low", "moderate", "high"] }
+          }
+        },
+        "integrations": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

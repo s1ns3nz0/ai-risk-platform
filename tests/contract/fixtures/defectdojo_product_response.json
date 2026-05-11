@@ -1,0 +1,16 @@
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 1,
+      "name": "payment-api",
+      "description": "QR code payment API",
+      "prod_type": 1,
+      "created": "2026-04-21T00:00:00Z",
+      "updated": "2026-04-21T00:00:00Z",
+      "tags": []
+    }
+  ]
+}

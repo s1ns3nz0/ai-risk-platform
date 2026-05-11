@@ -1,0 +1,13 @@
+{
+  "narrative": "Cross-signal analysis of payment-api reveals a compound risk profile. A high-severity SQL injection (semgrep) in the export endpoint combined with a detected AWS access key (gitleaks) creates a credential-theft-to-data-exfiltration chain. The IaC misconfiguration (checkov: unencrypted S3) amplifies the blast radius — exfiltrated data would land in plaintext storage. This pattern maps to PCI DSS 6.3.1 (secure coding) and 3.4.1 (data protection), both of which are mandatory for the product's CRITICAL risk tier.",
+  "cross_signal_insights": [
+    "SQL injection + exposed AWS key = potential for credential theft leading to data exfiltration",
+    "Unencrypted S3 + PCI data classification = compliance violation under PCI DSS 3.4.1"
+  ],
+  "recommendations": [
+    "Immediately rotate the exposed AWS access key and remediate the SQL injection",
+    "Enable S3 default encryption and add a Checkov policy gate for CKV_AWS_19",
+    "Review export.py for additional injection vectors beyond line 42"
+  ],
+  "gate_recommendation": "block"
+}

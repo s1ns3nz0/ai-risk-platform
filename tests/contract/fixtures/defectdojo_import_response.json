@@ -1,0 +1,15 @@
+{
+  "scan_type": "Generic Findings Import",
+  "test": 1,
+  "test_id": 1,
+  "engagement_id": 1,
+  "engagement_name": "pipeline-scan",
+  "product_id": 1,
+  "product_name": "payment-api",
+  "statistics": {
+    "created": 5,
+    "closed": 0,
+    "reactivated": 0,
+    "left_untouched": 0
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "requirements": [
+    {
+      "Shortcode": "V2.1.1",
+      "ShortName": "Password Security",
+      "Description": "Verify that user set passwords are at least 12 characters in length.",
+      "L1": {"Required": true},
+      "L2": {"Required": true},
+      "L3": {"Required": true},
+      "CWE": [521],
+      "NIST": ["5.1.1.2"]
+    },
+    {
+      "Shortcode": "V5.3.4",
+      "ShortName": "Output Encoding",
+      "Description": "Verify that data selection or database queries use parameterized queries.",
+      "L1": {"Required": false},
+      "L2": {"Required": true},
+      "L3": {"Required": true},
+      "CWE": [89],
+      "NIST": []
+    },
+    {
+      "Shortcode": "V14.2.1",
+      "ShortName": "Dependency",
+      "Description": "Verify that all components are up to date.",
+      "L1": {"Required": false},
+      "L2": {"Required": false},
+      "L3": {"Required": true},
+      "CWE": [1104],
+      "NIST": []
+    }
+  ]
+}

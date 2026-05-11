@@ -1,0 +1,17 @@
+title: Data Exfiltration Detected
+id: exfil-001
+status: stable
+level: critical
+description: Detects large data export events that may indicate exfiltration
+logsource:
+  category: application
+  product: payment-api
+detection:
+  selection:
+    event_type: data_export
+  condition: selection
+tags:
+  - attack.t1048
+  - attack.exfiltration
+control_ids:
+  - PCI-DSS-10.2.1

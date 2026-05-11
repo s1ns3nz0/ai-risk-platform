@@ -1,0 +1,18 @@
+title: Brute Force Login Attempt
+id: bf-001
+status: stable
+level: high
+description: Detects failed login attempt (aggregation-based brute force detection requires count operator, out of MVP-0 scope)
+logsource:
+  category: application
+  product: payment-api
+detection:
+  selection:
+    event_type: login_failed
+  condition: selection
+tags:
+  - attack.t1110
+  - attack.brute_force
+control_ids:
+  - PCI-DSS-10.2.1
+  - FISC-実127

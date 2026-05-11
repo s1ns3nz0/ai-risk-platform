@@ -1,0 +1,9 @@
+gate_recommendation: BLOCK
+id: RA-2026-0421-001
+narrative: 'Risk Assessment for payment-api: pre_merge trigger. Found 1 critical,
+  7 high findings across 13 controls. Data classification: PCI, PII-financial. Risk
+  score: 7.6/10. Gate recommendation: BLOCK.'
+product: payment-api
+risk_score: 7.6
+risk_tier: critical
+trigger: pre_merge

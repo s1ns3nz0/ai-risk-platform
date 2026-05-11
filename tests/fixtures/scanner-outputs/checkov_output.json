@@ -1,0 +1,53 @@
+{
+  "results": {
+    "passed_checks": [],
+    "failed_checks": [
+      {
+        "check_id": "CKV_AWS_19",
+        "check_name": "Ensure the S3 bucket has server-side-encryption enabled",
+        "check_result": {
+          "result": "FAILED"
+        },
+        "code_block": null,
+        "file_path": "/s3.tf",
+        "file_line_range": [1, 5],
+        "resource": "aws_s3_bucket.data",
+        "evaluations": null,
+        "check_class": "checkov.terraform.checks.resource.aws.S3Encryption",
+        "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/s3-policies/s3-14-data-encrypted-at-rest",
+        "severity": "HIGH"
+      },
+      {
+        "check_id": "CKV_AWS_18",
+        "check_name": "Ensure the S3 bucket has access logging enabled",
+        "check_result": {
+          "result": "FAILED"
+        },
+        "code_block": null,
+        "file_path": "/s3.tf",
+        "file_line_range": [1, 5],
+        "resource": "aws_s3_bucket.data",
+        "evaluations": null,
+        "check_class": "checkov.terraform.checks.resource.aws.S3AccessLogging",
+        "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/s3-policies/s3-13-enable-logging",
+        "severity": "MEDIUM"
+      },
+      {
+        "check_id": "CKV_AWS_24",
+        "check_name": "Ensure no security group allows ingress from 0.0.0.0/0 to port 22",
+        "check_result": {
+          "result": "FAILED"
+        },
+        "code_block": null,
+        "file_path": "/sg.tf",
+        "file_line_range": [1, 10],
+        "resource": "aws_security_group.public",
+        "evaluations": null,
+        "check_class": "checkov.terraform.checks.resource.aws.SecurityGroupUnrestrictedSSH",
+        "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-networking-policies/networking-2",
+        "severity": "HIGH"
+      }
+    ],
+    "skipped_checks": []
+  }
+}

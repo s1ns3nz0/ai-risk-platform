@@ -1,0 +1,46 @@
+# Compliance Mappings — determines which frameworks apply
+# based on data classification and jurisdiction.
+#
+# This is the ONLY place where "PCI → pci-dss-4.0" is defined.
+# No Python code should hardcode framework selection logic.
+#
+# To add a new framework:
+#   1. Add the baseline YAML to controls/baselines/
+#   2. Add the mapping here
+#   3. Update tier-mappings.yaml with the new framework
+#   No code changes needed.
+
+# Data classification → required frameworks
+data_classifications:
+  PCI:
+    frameworks: [pci-dss-4.0, asvs-4.0.3-L3]
+    description: "Payment card data — PCI DSS + application security baseline"
+  PII-financial:
+    frameworks: [asvs-4.0.3-L3]
+    description: "Financial personal data — application security baseline"
+  PII-general:
+    frameworks: [asvs-4.0.3-L3]
+    description: "Personal data — application security baseline"
+  PHI:
+    frameworks: [asvs-4.0.3-L3]
+    description: "Health data — application security baseline"
+
+# Jurisdiction → additional frameworks
+jurisdictions:
+  JP:
+    frameworks: [fisc-safety]
+    description: "Japan — FISC safety standards apply"
+  # EU:
+  #   frameworks: [gdpr]
+  #   description: "Europe — GDPR applies (future)"
+  # KR:
+  #   frameworks: [kisa]
+  #   description: "Korea — KISA standards apply (future)"
+
+# Tier determination — based on number of distinct frameworks
+# More frameworks = higher compliance burden = higher tier
+tier_thresholds:
+  critical: 3    # 3+ distinct frameworks → CRITICAL
+  high: 2        # 2 frameworks → HIGH
+  medium: 1      # 1 framework → MEDIUM
+  low: 0         # 0 frameworks → LOW
