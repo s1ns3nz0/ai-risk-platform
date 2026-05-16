@@ -1079,6 +1079,232 @@ def import_framework(
     click.echo("  5. Run: orchestrator assess ./your-app --product your-product")
 
 
+@cli.command("import-assess")
+@click.option("--results-dir", default=None, help="Directory containing scanner result JSON files")
+@click.option("--semgrep-results", default=None, help="Path to Semgrep JSON output")
+@click.option("--grype-results", default=None, help="Path to Grype JSON output")
+@click.option("--gitleaks-results", default=None, help="Path to Gitleaks JSON output")
+@click.option("--checkov-results", default=None, help="Path to Checkov JSON output")
+@click.option("--zap-results", default=None, help="Path to ZAP JSON output")
+@click.option("--product", required=True, help="Product name")
+@click.option("--trigger", default="pre_merge", type=click.Choice(["pre_merge", "pre_deploy", "periodic"]))
+@click.option("--controls-dir", default=None)
+@click.option("--tier-mappings", default=None)
+@click.option("--product-dir", default=None)
+@click.option("--output", default="output", help="Output directory for reports")
+@click.option("--format", "fmt", default="yaml", type=click.Choice(["yaml", "json"]))
+def import_assess(
+    results_dir: str | None,
+    semgrep_results: str | None,
+    grype_results: str | None,
+    gitleaks_results: str | None,
+    checkov_results: str | None,
+    zap_results: str | None,
+    product: str,
+    trigger: str,
+    controls_dir: str | None,
+    tier_mappings: str | None,
+    product_dir: str | None,
+    output: str,
+    fmt: str,
+) -> None:
+    """Import scanner results and run risk assessment.
+
+    Does NOT execute scanners — imports their pre-existing output files.
+    Use this when scanners run in your CI/CD pipeline and you want the
+    platform to assess the results.
+
+    Two modes:
+      --results-dir ./scanner-results/   Auto-detect all JSON files
+      --semgrep-results x.json --grype-results y.json   Explicit per-scanner
+    """
+    from orchestrator.parsers.registry import parse_results_directory, parse_results_file
+
+    prod_dir = Path(product_dir) if product_dir else _PROJECT_ROOT / "controls" / "products" / product
+    baselines = controls_dir or _default_path("controls/baselines")
+    mappings = tier_mappings or _default_path("controls/tier-mappings.yaml")
+    output_dir = Path(output)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # [1] Load configuration
+    click.echo("[1/6] Loading configuration")
+    manifest = load_manifest(str(prod_dir / "product-manifest.yaml"))
+    profile = load_profile(str(prod_dir / "risk-profile.yaml"))
+
+    repo = ControlsRepository(baselines_dir=baselines, tier_mappings_path=mappings)
+    repo.load_all()
+
+    assessor = get_assessor(repo)
+    tier = assessor.categorize(manifest)
+    controls = select_baseline(repo, manifest, tier)
+
+    cia = manifest.impact_levels
+    click.echo(f"      Product: {product} | Tier: {tier.value}")
+    click.echo(f"      CIA: C={cia.get('confidentiality','?')} I={cia.get('integrity','?')} A={cia.get('availability','?')}")
+
+    # [2] Import scanner results
+    click.echo("\n[2/6] Importing scanner results")
+    mapper = ControlMapper(repo)
+    findings: list[Finding] = []
+
+    if results_dir:
+        findings = parse_results_directory(results_dir, mapper)
+    else:
+        explicit_files = {
+            "semgrep": semgrep_results,
+            "grype": grype_results,
+            "gitleaks": gitleaks_results,
+            "checkov": checkov_results,
+            "zap": zap_results,
+        }
+        for scanner_type, file_path in explicit_files.items():
+            if file_path:
+                parsed = parse_results_file(file_path, scanner_type, mapper)
+                findings.extend(parsed)
+                click.echo(f"      {scanner_type}: {len(parsed)} findings from {file_path}")
+
+    if not findings:
+        click.echo("      No findings imported. Check your result file paths.")
+        sys.exit(0)
+
+    for f in findings:
+        f.product = product
+
+    # Summarize
+    scanner_counts: dict[str, int] = {}
+    for f in findings:
+        scanner_counts[f.source] = scanner_counts.get(f.source, 0) + 1
+    click.echo(f"      Total: {len(findings)} findings from {len(scanner_counts)} scanners")
+
+    # [3] EPSS enrichment
+    click.echo("\n[3/6] EPSS enrichment")
+    enriched_vulns = []
+    cve_findings = [f for f in findings if f.rule_id.startswith("CVE-")]
+    epss_enriched_count = 0
+    try:
+        from orchestrator.intelligence.enricher import VulnerabilityEnricher
+        from orchestrator.intelligence.epss import EpssClient
+
+        epss_client = EpssClient()
+        enricher = VulnerabilityEnricher(epss_client, mapper)
+        enriched_vulns = enricher.enrich(findings, manifest)
+        epss_enriched_count = sum(1 for v in enriched_vulns if v.epss_score is not None)
+    except Exception:
+        pass
+    click.echo(f"      EPSS enriched: {epss_enriched_count}/{len(cve_findings)} CVEs")
+
+    # [4] SP 800-30 Risk Assessment
+    model_id = os.environ.get("BEDROCK_MODEL_ID")
+    if model_id:
+        try:
+            from orchestrator.assessor.bedrock_client import BedrockClient as _BC
+            from orchestrator.rmf.pipeline import RiskAssessmentPipeline
+
+            bc = _BC(model_id=model_id, region=os.environ.get("AWS_DEFAULT_REGION", "ap-northeast-1"))
+            pipeline = RiskAssessmentPipeline(bedrock_client=bc)
+            click.echo("\n[4/6] SP 800-30 Risk Assessment (AI mode)")
+        except Exception:
+            pipeline = StaticRiskAssessmentPipeline()  # type: ignore[assignment]
+            click.echo("\n[4/6] SP 800-30 Risk Assessment (static mode)")
+    else:
+        pipeline = StaticRiskAssessmentPipeline()  # type: ignore[assignment]
+        click.echo("\n[4/6] SP 800-30 Risk Assessment (static mode)")
+
+    sp800_report = pipeline.run(
+        findings=findings,
+        enriched_vulns=enriched_vulns,
+        manifest=manifest,
+        controls=controls,
+        trigger=trigger,
+    )
+
+    click.echo(f"      Threat sources: {len(sp800_report.threat_sources)} identified")
+    click.echo(f"      Threat events: {len(sp800_report.threat_events)} identified")
+    if sp800_report.risk_determinations:
+        click.echo("      Risk determinations:")
+        level_counts: dict[str, int] = {}
+        for rd in sp800_report.risk_determinations:
+            level_counts[rd.risk_level.upper()] = level_counts.get(rd.risk_level.upper(), 0) + 1
+        for level, count in sorted(level_counts.items()):
+            click.echo(f"        {level}: {count}")
+
+    # [5] Gate + SAR + POA&M + Authorization
+    click.echo("\n[5/6] Gate evaluation + SAR + POA&M + Authorization")
+
+    from orchestrator.gate.combined import CombinedGateEvaluator
+    from orchestrator.gate.opa import OpaEvaluator
+
+    threshold_eval = ThresholdEvaluator(profile)
+    opa_eval = OpaEvaluator(str(_PROJECT_ROOT / "rego" / "gates"))
+    combined = CombinedGateEvaluator(threshold_eval, opa_eval)
+    context: dict[str, object] = {
+        "product": product,
+        "tier": tier.value,
+        "frameworks": profile.frameworks,
+        "findings_count": {
+            s: sum(1 for f in findings if f.severity == s)
+            for s in ["critical", "high", "medium", "low"]
+        },
+        "pci_scope_count": sum(
+            1 for f in findings if any(c.startswith("PCI-DSS") for c in f.control_ids)
+        ),
+        "secrets_count": sum(1 for f in findings if f.source == "gitleaks"),
+    }
+    gate = combined.evaluate(findings, tier, context)
+
+    sar_gen = SARGenerator(repo)
+    sar = sar_gen.generate(product=product, findings=findings, gate_decision=gate, risk_report=sp800_report)
+
+    poam_gen = POAMGenerator()
+    poam_items = poam_gen.generate(findings=findings, risk_report=sp800_report, gate_decision=gate)
+
+    auth_engine = AuthorizationEngine()
+    auth_decision = auth_engine.decide(gate_decision=gate, poam_items=poam_items)
+
+    click.echo(f"      Gate: {gate.passed and 'PASS' or 'BLOCKED'}")
+    click.echo(f"      SAR: {sar.satisfied}/{sar.total_controls} controls satisfied ({sar.coverage_percentage}%)")
+    click.echo(f"      POA&M: {len(poam_items)} items")
+    click.echo(f"      Authorization: {auth_decision.decision}")
+
+    # [6] Export reports
+    click.echo(f"\n[6/6] Reports exported")
+    import json as json_mod
+    from dataclasses import asdict
+
+    ext = fmt
+
+    def _serialize(obj: object) -> dict:  # type: ignore[type-arg]
+        if hasattr(obj, "__dataclass_fields__"):
+            return asdict(obj)  # type: ignore[arg-type]
+        return {}
+
+    def _write_report(name: str, data: dict) -> None:  # type: ignore[type-arg]
+        path = output_dir / f"{name}-{product}.{ext}"
+        if fmt == "json":
+            path.write_text(json_mod.dumps(data, indent=2, default=str))
+        else:
+            path.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False))
+        click.echo(f"      {path}")
+
+    _write_report("sp800-30", _serialize(sp800_report))
+    _write_report("sar", _serialize(sar))
+    _write_report("poam", {"product": product, "total_items": len(poam_items), "items": [_serialize(item) for item in poam_items]})
+    _write_report("authorization", _serialize(auth_decision))
+
+    # Dashboard JSON
+    try:
+        from orchestrator.exporters.dashboard import export_dashboard
+        export_dashboard(
+            report=sp800_report, sar=sar, poam_items=poam_items,
+            authorization=auth_decision, output_dir=str(output_dir),
+        )
+    except Exception:
+        pass
+
+    click.echo(f"\n{'PASS' if gate.passed else 'DATO'}: {auth_decision.reasoning}")
+    sys.exit(0 if gate.passed else 1)
+
+
 @cli.command()
 @click.argument("target_path")
 @click.option("--product", default="payment-api")
