@@ -1,15 +1,16 @@
 """Parser registry — auto-detects scanner type from result files.
 
 Each parser extracts normalized Finding objects from a scanner's
-native output format (JSON, SARIF, etc.). No scanner binaries required.
+output format. No scanner binaries required.
 
-Supported formats:
-  - Semgrep JSON (--json output)
-  - Grype JSON (--output json)
-  - Gitleaks JSON (--report-format json)
-  - Checkov JSON (--output json)
-  - ZAP JSON (zap-results.json from zap-api-scan.py)
-  - SARIF (generic, from any SARIF-producing tool)
+Supported formats (in priority order):
+  1. SARIF 2.1.0 — universal format, works with ANY tool
+     (Semgrep, Grype, Trivy, Bandit, Checkov, CodeQL, Snyk, Hadolint, etc.)
+  2. Native JSON — tool-specific parsers for non-SARIF output
+     (Semgrep, Grype, Gitleaks, Checkov, ZAP)
+
+Recommendation: Configure your scanners to output SARIF (--sarif flag).
+This makes the platform truly tool-agnostic.
 """
 
 from __future__ import annotations
@@ -56,8 +57,8 @@ def detect_scanner(file_path: str) -> str | None:
         if keys and all(k in data for k in keys):
             return scanner
 
-    # SARIF detection
-    if data.get("$schema", "").endswith("sarif") or data.get("version") == "2.1.0":
+    # SARIF detection (check FIRST — SARIF is the universal format)
+    if data.get("version") == "2.1.0" or "sarif" in str(data.get("$schema", "")):
         return "sarif"
 
     return None
@@ -108,6 +109,10 @@ def parse_results_file(
     if scanner_type == "zap":
         from orchestrator.scanners.zap import ZapScanner
         return ZapScanner(control_mapper).parse_output(raw)
+
+    if scanner_type == "sarif":
+        from orchestrator.parsers.sarif import parse_sarif
+        return parse_sarif(raw, control_mapper)
 
     logger.warning("Unsupported scanner type: %s", scanner_type)
     return []
