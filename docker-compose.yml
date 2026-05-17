@@ -1,0 +1,72 @@
+version: "3.9"
+
+# Local DefectDojo stack — optional evidence sink for the platform.
+# Spin up with: docker compose up -d
+# Then point the CLI/server at it via DEFECTDOJO_URL + DD_API_KEY.
+#
+# All exposed ports bind to 127.0.0.1 to avoid accidental LAN exposure
+# from a developer laptop.
+
+services:
+  uwsgi:
+    image: defectdojo/defectdojo-django:latest
+    platform: linux/amd64
+    depends_on:
+      - defectdojo-postgres
+      - defectdojo-redis
+    environment:
+      DD_DATABASE_URL: "postgresql://defectdojo:defectdojo@defectdojo-postgres:5432/defectdojo"
+      DD_CELERY_BROKER_URL: "redis://defectdojo-redis:6379/0"
+      DD_DEBUG: "False"
+      DD_SECRET_KEY: "change-me-in-prod"
+
+  defectdojo-nginx:
+    image: defectdojo/defectdojo-nginx:latest
+    platform: linux/amd64
+    depends_on:
+      - uwsgi
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  defectdojo-celery-beat:
+    image: defectdojo/defectdojo-django:latest
+    platform: linux/amd64
+    depends_on:
+      - defectdojo-postgres
+      - defectdojo-redis
+    command: /entrypoint-celery-beat.sh
+    environment:
+      DD_DATABASE_URL: "postgresql://defectdojo:defectdojo@defectdojo-postgres:5432/defectdojo"
+      DD_CELERY_BROKER_URL: "redis://defectdojo-redis:6379/0"
+
+  defectdojo-celery-worker:
+    image: defectdojo/defectdojo-django:latest
+    platform: linux/amd64
+    depends_on:
+      - defectdojo-postgres
+      - defectdojo-redis
+    command: /entrypoint-celery-worker.sh
+    environment:
+      DD_DATABASE_URL: "postgresql://defectdojo:defectdojo@defectdojo-postgres:5432/defectdojo"
+      DD_CELERY_BROKER_URL: "redis://defectdojo-redis:6379/0"
+
+  defectdojo-postgres:
+    image: postgres:15-alpine
+    platform: linux/amd64
+    environment:
+      POSTGRES_DB: defectdojo
+      POSTGRES_USER: defectdojo
+      POSTGRES_PASSWORD: defectdojo
+    volumes:
+      - defectdojo-postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  defectdojo-redis:
+    image: redis:7-alpine
+    platform: linux/amd64
+    ports:
+      - "127.0.0.1:6379:6379"
+
+volumes:
+  defectdojo-postgres-data:

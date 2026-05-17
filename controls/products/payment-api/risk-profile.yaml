@@ -1,0 +1,29 @@
+risk_profile:
+  frameworks:
+    - pci-dss-4.0
+    - asvs-4.0.3-L3
+    - fisc-safety
+  risk_appetite: conservative
+  thresholds:
+    critical:
+      max_critical_findings: 0
+      max_secrets_detected: 0
+      action: block
+    high:
+      max_critical_findings: 0
+      max_high_findings_pci: 0
+      action: block
+    medium:
+      max_high_findings: 5
+      action: proceed
+    low:
+      action: proceed
+  failure_policy:
+    critical:
+      scan_failure: block
+    high:
+      scan_failure: block
+    medium:
+      scan_failure: proceed
+    low:
+      scan_failure: proceed

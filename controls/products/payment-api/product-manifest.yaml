@@ -1,0 +1,114 @@
+product:
+  name: payment-api
+  description: "QR code payment confirmation service"
+
+  data_classification:
+    - PCI
+    - PII-financial
+
+  jurisdiction:
+    - JP
+
+  deployment:
+    cloud: AWS
+    region: ap-northeast-1
+
+    compute:
+      - type: EKS
+        description: "Main application containers"
+      - type: Lambda
+        description: "Payment notification handler"
+
+    databases:
+      - type: RDS
+        engine: PostgreSQL
+        encryption: required
+        description: "Payment records + cardholder data"
+      - type: DynamoDB
+        description: "Session cache"
+
+    storage:
+      - type: S3
+        encryption: required
+        public_access: denied
+        description: "Payment receipts + audit logs"
+
+    networking:
+      - type: API-Gateway
+        description: "Public REST API endpoint"
+      - type: ALB
+        description: "Internal load balancer"
+
+    messaging:
+      - type: SQS
+        encryption: required
+        description: "Payment processing queue"
+
+    observability:
+      - type: CloudWatch
+        log_retention_days: 365
+        description: "Application + audit logs"
+
+  impact_levels:
+    confidentiality: high
+    integrity: high
+    availability: moderate
+
+  # ── Mission Context (MbCRA) ──
+  # Connects technical risk to business mission impact.
+  # AI uses this to produce business-relevant risk narratives.
+  mission:
+    business_function: "QR payment processing and confirmation"
+    criticality: mission-critical    # mission-critical / business-important / routine
+    revenue_impact: "$2M per day"
+    users_affected: "3M+ monthly active users"
+
+    sla_requirements:
+      - partner: "Payment Gateway Corp"
+        uptime: "99.99%"
+        penalty: "$50K per hour of downtime"
+      - partner: "SMBC Settlement"
+        uptime: "99.95%"
+        penalty: "$10K per incident"
+
+    recovery_objectives:
+      rto: "15 minutes"          # Recovery Time Objective
+      rpo: "0 seconds"          # Recovery Point Objective (no transaction loss)
+
+    dependencies:
+      - system: "external-payment-gateway"
+        criticality: critical
+        impact_if_unavailable: "Cannot process any payments — full revenue loss"
+      - system: "internal-user-db"
+        criticality: high
+        impact_if_unavailable: "Cannot authenticate users — service degraded"
+      - system: "SQS payment queue"
+        criticality: high
+        impact_if_unavailable: "Payment confirmations delayed — SLA risk"
+
+    # What happens when each CIA dimension is compromised
+    mission_impact_scenarios:
+      confidentiality_breach:
+        description: "Cardholder data (PAN, CVV) leaked to unauthorized party"
+        business_impact: "PCI DSS compliance revocation, regulatory fine, customer trust loss, payment license suspension"
+        estimated_cost: "$5M-50M"
+        affected_stakeholders: ["customers", "FSA-regulators", "payment-partner", "legal"]
+        regulatory_notification: "72 hours (PCI DSS), FISC incident reporting"
+
+      integrity_compromise:
+        description: "Payment amounts or recipient accounts tampered"
+        business_impact: "Financial fraud, incorrect settlements, partner dispute, potential license revocation"
+        estimated_cost: "Unlimited — depends on tampering duration and detection speed"
+        affected_stakeholders: ["finance-team", "customers", "payment-partner", "auditors"]
+        detection_method: "Transaction reconciliation (daily), Sigma rule data_exfiltration"
+
+      availability_loss:
+        description: "QR payment service unavailable"
+        business_impact: "Revenue loss $2M/day, SLA penalty $50K/hour, customer churn"
+        estimated_cost: "$2M per day + cumulative SLA penalties"
+        affected_stakeholders: ["customers", "business-ops", "payment-partner"]
+        max_tolerable_downtime: "15 minutes (RTO)"
+
+  integrations:
+    - external-payment-gateway
+    - internal-user-db
