@@ -24,7 +24,7 @@ from orchestrator.rmf.static_pipeline import StaticRiskAssessmentPipeline
 from orchestrator.scanners.control_mapper import ControlMapper
 from orchestrator.scanners.runner import ScannerRunner
 from orchestrator.sigma.engine import SigmaEngine
-from orchestrator.types import Finding, RiskTier
+from orchestrator.types import Finding, RiskTier, is_secret_finding
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -354,7 +354,7 @@ def assess(
         "pci_scope_count": sum(
             1 for f in findings if any(c.startswith("PCI-DSS") for c in f.control_ids)
         ),
-        "secrets_count": sum(1 for f in findings if f.source == "gitleaks"),
+        "secrets_count": sum(1 for f in findings if is_secret_finding(f)),
     }
     gate = combined.evaluate(findings, tier, context)
 
@@ -532,7 +532,7 @@ def risk_assess(target_path: str, product: str, trigger: str, output: str, fmt: 
         "pci_scope_count": sum(
             1 for f in findings if any(c.startswith("PCI-DSS") for c in f.control_ids)
         ),
-        "secrets_count": sum(1 for f in findings if f.source == "gitleaks"),
+        "secrets_count": sum(1 for f in findings if is_secret_finding(f)),
     }
     gate = combined.evaluate(findings, tier, context)
 
@@ -1248,7 +1248,7 @@ def import_assess(
         "pci_scope_count": sum(
             1 for f in findings if any(c.startswith("PCI-DSS") for c in f.control_ids)
         ),
-        "secrets_count": sum(1 for f in findings if f.source == "gitleaks"),
+        "secrets_count": sum(1 for f in findings if is_secret_finding(f)),
     }
     gate = combined.evaluate(findings, tier, context)
 

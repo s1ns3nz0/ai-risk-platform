@@ -22,7 +22,7 @@ def test_request_id_honors_caller(client):
 
 def test_invalid_scanner_name_rejected(client):
     bad = {
-        "results": [{"scanner": "snyk", "content": {"results": [], "errors": []}}]
+        "results": [{"scanner": "made-up-scanner", "content": {"results": [], "errors": []}}]
     }
     r = client.post("/v1/products/payment-api/assess", json=bad)
     assert r.status_code == 422

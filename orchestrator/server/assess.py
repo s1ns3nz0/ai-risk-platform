@@ -29,6 +29,7 @@ from orchestrator.types import (
     ProductManifest,
     RiskProfile,
     RiskTier,
+    is_secret_finding,
 )
 
 
@@ -116,7 +117,7 @@ def run_assessment(
         "pci_scope_count": sum(
             1 for f in tagged if any(c.startswith("PCI-DSS") for c in f.control_ids)
         ),
-        "secrets_count": sum(1 for f in tagged if f.source == "gitleaks"),
+        "secrets_count": sum(1 for f in tagged if is_secret_finding(f)),
     }
     gate = combined.evaluate(tagged, tier, context)
 

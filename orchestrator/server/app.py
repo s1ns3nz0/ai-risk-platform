@@ -428,6 +428,25 @@ def _require_async_for_bedrock(state: ServerState, async_mode: bool) -> None:
         )
 
 
+# Map externally-accepted scanner names to the canonical parser they route to.
+# Trivy subcommands (fs/image/config) all produce the same JSON shape.
+# grype-image is the same shape as grype. hadolint/spotbugs/snyk/bandit/codeql
+# emit SARIF natively or via their official SARIF plugins.
+_SCANNER_ALIASES: dict[str, str] = {
+    "grype-image": "grype",
+    "trivy-fs": "trivy",
+    "trivy-image": "trivy",
+    "trivy-config": "trivy",
+    "trivy-sarif": "sarif",
+    "hadolint": "sarif",
+    "spotbugs": "sarif",
+    "snyk": "sarif",
+    "bandit": "sarif",
+    "codeql": "sarif",
+    "semgrep-sarif": "sarif",
+}
+
+
 def _parse_payloads(
     payloads: list[ScannerResultPayload],
     state: ServerState,
@@ -443,6 +462,12 @@ def _parse_payloads(
         scanner = entry.scanner or detect_scanner_from_content(entry.content)
         if scanner is None:
             continue
+        # Resolve alias → canonical before dispatch, log so operators can see
+        # which tool the caller said it was vs. which parser actually ran.
+        canonical = _SCANNER_ALIASES.get(scanner, scanner)
+        if canonical != scanner:
+            logger.info("scanner alias resolved: %s → %s", scanner, canonical)
+        scanner = canonical
         if scanner == "sarif":
             all_findings.extend(parse_sarif(raw, mapper))
             continue
@@ -458,6 +483,9 @@ def _parse_inline(scanner: str, raw: str, mapper: ControlMapper) -> list[Finding
     if scanner == "grype":
         from orchestrator.scanners.grype import GrypeScanner
         return GrypeScanner(mapper).parse_output(raw)
+    if scanner == "trivy":
+        from orchestrator.scanners.trivy import TrivyScanner
+        return TrivyScanner(mapper).parse_output(raw)
     if scanner == "gitleaks":
         from orchestrator.scanners.gitleaks import GitleaksScanner
         return GitleaksScanner(mapper).parse_output(raw)

@@ -15,8 +15,15 @@ class ScannerResultPayload(BaseModel):
 
     scanner: str | None = Field(
         default=None,
-        description="Scanner name (semgrep|grype|gitleaks|checkov|zap|sarif). "
-        "When omitted, the parser auto-detects from content.",
+        description=(
+            "Scanner name. Native parsers: semgrep|grype|trivy|gitleaks|checkov|zap. "
+            "Universal SARIF: sarif. "
+            "Aliases route to canonical parsers — grype-image→grype, "
+            "trivy-fs/-image/-config→trivy, trivy-sarif→sarif, "
+            "hadolint/spotbugs/snyk/bandit/codeql/semgrep-sarif→sarif. "
+            "Spotbugs callers must use the SARIF plugin output (XML is not "
+            "supported). When omitted, the parser auto-detects from content."
+        ),
     )
     content: Any = Field(
         description="Parsed JSON of the scanner output (object or array).",
@@ -34,7 +41,17 @@ class ScannerResultPayload(BaseModel):
     def _scanner_allowed(cls, v: str | None) -> str | None:
         if v is None:
             return v
-        allowed = {"semgrep", "grype", "gitleaks", "checkov", "zap", "sarif"}
+        # Canonical parsers + aliases recognised by the HTTP layer.
+        allowed = {
+            # canonical
+            "semgrep", "grype", "trivy", "gitleaks", "checkov", "zap", "sarif",
+            # grype variants
+            "grype-image",
+            # trivy variants
+            "trivy-fs", "trivy-image", "trivy-config", "trivy-sarif",
+            # SARIF-native tools
+            "hadolint", "spotbugs", "snyk", "bandit", "codeql", "semgrep-sarif",
+        }
         if v not in allowed:
             raise ValueError(f"scanner must be one of {sorted(allowed)}")
         return v

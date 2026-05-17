@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from orchestrator.types import Finding, GateDecision, RiskProfile, RiskTier
+from orchestrator.types import Finding, GateDecision, RiskProfile, RiskTier, is_secret_finding
 
 
 class ThresholdEvaluator:
@@ -41,7 +41,7 @@ class ThresholdEvaluator:
                 findings_count=findings_count,
             )
 
-        secrets_count = sum(1 for f in findings if f.source == "gitleaks")
+        secrets_count = sum(1 for f in findings if is_secret_finding(f))
         pci_high_count = sum(
             1
             for f in findings

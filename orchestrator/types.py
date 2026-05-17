@@ -61,6 +61,16 @@ class Finding:
     fixed_version: str = ""
 
 
+def is_secret_finding(f: Finding) -> bool:
+    """A secret-detection finding regardless of which scanner produced it.
+
+    gitleaks is the canonical secret scanner, but Trivy (and others) also
+    detect secrets and tag them with the `secret-` rule_id prefix so the
+    gate's secrets_count picks them up too.
+    """
+    return f.source == "gitleaks" or f.rule_id.startswith("secret-")
+
+
 @dataclass
 class RiskReport:
     """Risk assessment result."""

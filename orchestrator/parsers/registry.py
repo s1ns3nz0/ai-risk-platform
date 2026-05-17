@@ -5,9 +5,16 @@ output format. No scanner binaries required.
 
 Supported formats (in priority order):
   1. SARIF 2.1.0 — universal format, works with ANY tool
-     (Semgrep, Grype, Trivy, Bandit, Checkov, CodeQL, Snyk, Hadolint, etc.)
+     (Semgrep, Grype, Trivy, Bandit, Checkov, CodeQL, Snyk, Hadolint,
+     Spotbugs, etc.)
   2. Native JSON — tool-specific parsers for non-SARIF output
-     (Semgrep, Grype, Gitleaks, Checkov, ZAP)
+     (Semgrep, Grype, Trivy, Gitleaks, Checkov, ZAP)
+
+Aliases recognised at the HTTP layer (see server/app.py):
+  grype-image    → grype     (same parser, different scan target)
+  hadolint       → sarif     (hadolint emits SARIF natively)
+  spotbugs       → sarif     (Spotbugs SARIF plugin output)
+  trivy-sarif    → sarif     (when running `trivy --format sarif`)
 
 Recommendation: Configure your scanners to output SARIF (--sarif flag).
 This makes the platform truly tool-agnostic.
@@ -26,11 +33,12 @@ logger = logging.getLogger(__name__)
 
 # Scanner detection signatures — keys found in each scanner's JSON output
 _SIGNATURES: dict[str, list[str]] = {
-    "semgrep": ["results", "errors"],           # Semgrep JSON has "results" array
-    "grype": ["matches", "descriptor"],          # Grype JSON has "matches" array
-    "gitleaks": [],                              # Gitleaks is a bare array of objects with "RuleID"
-    "checkov": ["passed_checks", "failed_checks"],  # Checkov JSON
-    "zap": ["site"],                             # ZAP JSON has "site" array
+    "semgrep": ["results", "errors"],                  # Semgrep JSON has "results" array
+    "grype": ["matches", "descriptor"],                 # Grype JSON has "matches" array
+    "trivy": ["SchemaVersion", "ArtifactName", "Results"],  # Trivy native JSON
+    "gitleaks": [],                                     # Gitleaks is a bare array of objects with "RuleID"
+    "checkov": ["passed_checks", "failed_checks"],     # Checkov JSON
+    "zap": ["site"],                                    # ZAP JSON has "site" array
 }
 
 
@@ -115,6 +123,10 @@ def parse_results_file(
     if scanner_type == "zap":
         from orchestrator.scanners.zap import ZapScanner
         return ZapScanner(control_mapper).parse_output(raw)
+
+    if scanner_type == "trivy":
+        from orchestrator.scanners.trivy import TrivyScanner
+        return TrivyScanner(control_mapper).parse_output(raw)
 
     if scanner_type == "sarif":
         from orchestrator.parsers.sarif import parse_sarif
