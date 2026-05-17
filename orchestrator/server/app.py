@@ -237,11 +237,11 @@ def create_app(
         cfg = _get_product_or_404(state, name)
         _require_async_for_bedrock(state, req.async_mode)
         findings = _parse_payloads(req.results, state)
+        # Zero findings is a valid outcome (clean scan) — proceed and let the
+        # assessor produce a low-risk report. The /assess endpoint only 400s
+        # for truly malformed input (pydantic 422) or product-not-found (404).
         if not findings:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No findings parsed from supplied scanner results",
-            )
+            logger.info("assess: zero findings parsed for product=%s (clean scan)", name)
 
         # Distributed path: serialize a descriptor onto Redis. Any replica may execute.
         if isinstance(backend, RedisBackend) and req.async_mode:
@@ -432,6 +432,8 @@ def _require_async_for_bedrock(state: ServerState, async_mode: bool) -> None:
 # Trivy subcommands (fs/image/config) all produce the same JSON shape.
 # grype-image is the same shape as grype. hadolint/spotbugs/snyk/bandit/codeql
 # emit SARIF natively or via their official SARIF plugins.
+# Note: spotbugs is NOT aliased to sarif because it's now a polymorphic
+# parser — accepts SARIF (dict) and raw/base64-encoded XML (string).
 _SCANNER_ALIASES: dict[str, str] = {
     "grype-image": "grype",
     "trivy-fs": "trivy",
@@ -439,7 +441,6 @@ _SCANNER_ALIASES: dict[str, str] = {
     "trivy-config": "trivy",
     "trivy-sarif": "sarif",
     "hadolint": "sarif",
-    "spotbugs": "sarif",
     "snyk": "sarif",
     "bandit": "sarif",
     "codeql": "sarif",
@@ -451,29 +452,72 @@ def _parse_payloads(
     payloads: list[ScannerResultPayload],
     state: ServerState,
 ) -> list[Finding]:
+    """Parse every entry into findings, treating each entry independently.
+
+    A single bad/empty entry must not fail the batch — log it and continue.
+    This matches what CI pipelines actually look like: 8 scanners run in
+    parallel, some produce empty results, some fail. The batch should still
+    yield findings from the successful ones.
+    """
     from orchestrator.parsers.registry import detect_scanner_from_content
     from orchestrator.parsers.sarif import parse_sarif
 
     mapper = ControlMapper(state.controls_repo)
     all_findings: list[Finding] = []
 
-    for entry in payloads:
-        raw = json.dumps(entry.content)
-        scanner = entry.scanner or detect_scanner_from_content(entry.content)
-        if scanner is None:
+    for idx, entry in enumerate(payloads):
+        try:
+            findings = _parse_one_entry(entry, idx, mapper, detect_scanner_from_content, parse_sarif)
+        except Exception as exc:  # parser bug shouldn't kill the batch
+            logger.warning(
+                "results[%d] (scanner=%s): parser raised %s — skipping",
+                idx, entry.scanner, type(exc).__name__,
+            )
             continue
-        # Resolve alias → canonical before dispatch, log so operators can see
-        # which tool the caller said it was vs. which parser actually ran.
-        canonical = _SCANNER_ALIASES.get(scanner, scanner)
-        if canonical != scanner:
-            logger.info("scanner alias resolved: %s → %s", scanner, canonical)
-        scanner = canonical
-        if scanner == "sarif":
-            all_findings.extend(parse_sarif(raw, mapper))
-            continue
-        all_findings.extend(_parse_inline(scanner, raw, mapper))
+        all_findings.extend(findings)
 
     return all_findings
+
+
+def _parse_one_entry(
+    entry: ScannerResultPayload,
+    idx: int,
+    mapper: ControlMapper,
+    detect: Any,
+    parse_sarif: Any,
+) -> list[Finding]:
+    # Empty/null content → not an error, just no findings.
+    if entry.content is None or entry.content == "" or entry.content == [] or entry.content == {}:
+        logger.info("results[%d] (scanner=%s): empty content, treating as zero findings", idx, entry.scanner)
+        return []
+
+    scanner = entry.scanner
+    if scanner is None:
+        scanner = detect(entry.content) if not isinstance(entry.content, str) else None
+        if scanner is None:
+            logger.warning("results[%d]: scanner unspecified and auto-detect failed — skipping", idx)
+            return []
+
+    canonical = _SCANNER_ALIASES.get(scanner, scanner)
+    if canonical != scanner:
+        logger.info("results[%d]: scanner alias %s → %s", idx, scanner, canonical)
+    scanner = canonical
+
+    # String content is for XML scanners only (spotbugs). Skip otherwise.
+    if isinstance(entry.content, str):
+        if scanner != "spotbugs":
+            logger.warning(
+                "results[%d] (scanner=%s): string content only supported for spotbugs — skipping",
+                idx, scanner,
+            )
+            return []
+        from orchestrator.scanners.spotbugs import SpotbugsScanner
+        return SpotbugsScanner(mapper).parse_output(entry.content)
+
+    raw = json.dumps(entry.content)
+    if scanner == "sarif":
+        return parse_sarif(raw, mapper)
+    return _parse_inline(scanner, raw, mapper)
 
 
 def _parse_inline(scanner: str, raw: str, mapper: ControlMapper) -> list[Finding]:
@@ -495,6 +539,11 @@ def _parse_inline(scanner: str, raw: str, mapper: ControlMapper) -> list[Finding
     if scanner == "zap":
         from orchestrator.scanners.zap import ZapScanner
         return ZapScanner(mapper).parse_output(raw)
+    if scanner == "spotbugs":
+        # JSON content path — typically the SARIF plugin output. The XML/base64
+        # string path is handled in _parse_one_entry before _parse_inline runs.
+        from orchestrator.parsers.sarif import parse_sarif
+        return parse_sarif(raw, mapper)
     return []
 
 

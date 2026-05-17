@@ -17,14 +17,21 @@ def test_sync_assessment_returns_full_report(client, semgrep_payload):
     assert body["gate"]["passed"] is False
 
 
-def test_no_findings_returns_400(client):
+def test_zero_findings_is_a_clean_scan_not_an_error(client):
+    """A successful scan that produced zero findings is a valid assessment
+    outcome (low risk). The endpoint must NOT 400 on this — that would
+    force every CI to special-case clean runs."""
     empty = {
         "results": [
             {"scanner": "semgrep", "content": {"results": [], "errors": []}}
         ]
     }
     r = client.post("/v1/products/payment-api/assess", json=empty)
-    assert r.status_code == 400
+    assert r.status_code == 200
+    body = r.json()
+    assert body["findings_count"] == 0
+    # Clean scan → gate passes.
+    assert body["gate"]["passed"] is True
 
 
 def test_unknown_product_returns_404(client, semgrep_payload):

@@ -16,25 +16,33 @@ class ScannerResultPayload(BaseModel):
     scanner: str | None = Field(
         default=None,
         description=(
-            "Scanner name. Native parsers: semgrep|grype|trivy|gitleaks|checkov|zap. "
+            "Scanner name. Native parsers: semgrep|grype|trivy|gitleaks|checkov|zap|spotbugs. "
             "Universal SARIF: sarif. "
             "Aliases route to canonical parsers — grype-image→grype, "
             "trivy-fs/-image/-config→trivy, trivy-sarif→sarif, "
-            "hadolint/spotbugs/snyk/bandit/codeql/semgrep-sarif→sarif. "
-            "Spotbugs callers must use the SARIF plugin output (XML is not "
-            "supported). When omitted, the parser auto-detects from content."
+            "hadolint/snyk/bandit/codeql/semgrep-sarif→sarif. "
+            "Spotbugs accepts either SARIF (object/array) or raw/base64-encoded "
+            "XML (string). When omitted, the parser auto-detects from content."
         ),
     )
     content: Any = Field(
-        description="Parsed JSON of the scanner output (object or array).",
+        default=None,
+        description=(
+            "Scanner output. Typically a JSON object/array. "
+            "Null is treated as 'no findings' (logged, not an error) — useful "
+            "when a scanner produced an empty result file. "
+            "Strings are accepted only for XML-emitting scanners (spotbugs)."
+        ),
     )
 
     @field_validator("content")
     @classmethod
-    def _content_must_be_json_container(cls, v: Any) -> Any:
-        if not isinstance(v, (dict, list)):
-            raise ValueError("content must be a JSON object or array")
-        return v
+    def _content_shape_ok(cls, v: Any) -> Any:
+        # Numbers, booleans, and other primitives are still rejected — they
+        # can't represent scanner output meaningfully. None/dict/list/str pass.
+        if v is None or isinstance(v, (dict, list, str)):
+            return v
+        raise ValueError("content must be a JSON object/array, a string (XML), or null")
 
     @field_validator("scanner")
     @classmethod

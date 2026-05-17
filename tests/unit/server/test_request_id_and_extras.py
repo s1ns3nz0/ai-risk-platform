@@ -28,10 +28,21 @@ def test_invalid_scanner_name_rejected(client):
     assert r.status_code == 422
 
 
-def test_non_container_content_rejected(client):
-    bad = {"results": [{"scanner": "semgrep", "content": "not-an-object"}]}
+def test_primitive_content_rejected_at_validator(client):
+    """Numbers/booleans can't represent scanner output → 422.
+    (Strings ARE accepted now — they route to Spotbugs XML parser.)"""
+    bad = {"results": [{"scanner": "semgrep", "content": 42}]}
     r = client.post("/v1/products/payment-api/assess", json=bad)
     assert r.status_code == 422
+
+
+def test_string_content_for_non_spotbugs_is_skipped_not_rejected(client):
+    """String content for semgrep should be skipped at the parser layer
+    (logged, returns no findings) — not rejected at validation."""
+    bad = {"results": [{"scanner": "semgrep", "content": "not-an-object"}]}
+    r = client.post("/v1/products/payment-api/assess", json=bad)
+    assert r.status_code == 200
+    assert r.json()["findings_count"] == 0
 
 
 def test_bedrock_mode_rejects_sync(server_state, semgrep_payload):

@@ -5,16 +5,20 @@ output format. No scanner binaries required.
 
 Supported formats (in priority order):
   1. SARIF 2.1.0 — universal format, works with ANY tool
-     (Semgrep, Grype, Trivy, Bandit, Checkov, CodeQL, Snyk, Hadolint,
-     Spotbugs, etc.)
+     (Semgrep, Grype, Trivy, Bandit, Checkov, CodeQL, Snyk, Hadolint, etc.)
   2. Native JSON — tool-specific parsers for non-SARIF output
      (Semgrep, Grype, Trivy, Gitleaks, Checkov, ZAP)
+  3. Native XML — Spotbugs (raw or base64-encoded BugCollection)
 
 Aliases recognised at the HTTP layer (see server/app.py):
-  grype-image    → grype     (same parser, different scan target)
-  hadolint       → sarif     (hadolint emits SARIF natively)
-  spotbugs       → sarif     (Spotbugs SARIF plugin output)
-  trivy-sarif    → sarif     (when running `trivy --format sarif`)
+  grype-image                 → grype
+  trivy-fs / -image / -config → trivy
+  trivy-sarif                 → sarif
+  hadolint / snyk / bandit /
+  codeql / semgrep-sarif      → sarif
+
+Spotbugs is polymorphic: object/array content is treated as SARIF; a
+string is decoded (base64 → raw) and parsed as Spotbugs XML.
 
 Recommendation: Configure your scanners to output SARIF (--sarif flag).
 This makes the platform truly tool-agnostic.
@@ -31,14 +35,17 @@ from orchestrator.types import Finding
 
 logger = logging.getLogger(__name__)
 
-# Scanner detection signatures — keys found in each scanner's JSON output
+# Scanner detection signatures — keys found in each scanner's JSON output.
+# `_SIGNATURES_NESTED` is for shapes where the discriminating keys live under
+# a sub-object (Checkov's actual output is {check_type, results, summary, url}
+# with passed_checks/failed_checks nested under .results).
 _SIGNATURES: dict[str, list[str]] = {
-    "semgrep": ["results", "errors"],                  # Semgrep JSON has "results" array
-    "grype": ["matches", "descriptor"],                 # Grype JSON has "matches" array
-    "trivy": ["SchemaVersion", "ArtifactName", "Results"],  # Trivy native JSON
-    "gitleaks": [],                                     # Gitleaks is a bare array of objects with "RuleID"
-    "checkov": ["passed_checks", "failed_checks"],     # Checkov JSON
-    "zap": ["site"],                                    # ZAP JSON has "site" array
+    "semgrep": ["results", "errors"],                       # Semgrep JSON
+    "grype": ["matches", "descriptor"],                      # Grype JSON
+    "trivy": ["SchemaVersion", "ArtifactName", "Results"],   # Trivy native JSON
+    "gitleaks": [],                                          # bare array of {RuleID:...}
+    "checkov": ["check_type", "results", "summary"],         # Checkov nested shape
+    "zap": ["site"],                                         # ZAP JSON
 }
 
 
@@ -127,6 +134,10 @@ def parse_results_file(
     if scanner_type == "trivy":
         from orchestrator.scanners.trivy import TrivyScanner
         return TrivyScanner(control_mapper).parse_output(raw)
+
+    if scanner_type == "spotbugs":
+        from orchestrator.scanners.spotbugs import SpotbugsScanner
+        return SpotbugsScanner(control_mapper).parse_output(raw)
 
     if scanner_type == "sarif":
         from orchestrator.parsers.sarif import parse_sarif
