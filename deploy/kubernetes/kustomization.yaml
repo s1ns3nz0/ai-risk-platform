@@ -1,0 +1,18 @@
+# Apply with: kubectl apply -k deploy/kubernetes/
+# Or for individual files: kubectl apply -f deploy/kubernetes/<file>.yaml
+#
+# This base intentionally excludes the .example files — copy and rename them
+# before applying:
+#   cp 10-secret.example.yaml 10-secret.yaml         # edit api-key
+#   cp 11-configmap-products.example.yaml 11-configmap-products.yaml
+#   cp 60-ingress.example.yaml 60-ingress.yaml       # set your host
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ai-risk-platform
+resources:
+  - 00-namespace.yaml
+  - 20-serviceaccount.yaml
+  - 30-deployment.yaml
+  - 31-service.yaml
+  - 40-redis.yaml
+  - 50-hpa.yaml

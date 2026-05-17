@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-risk-platform
+  namespace: ai-risk-platform
+  labels:
+    app.kubernetes.io/name: ai-risk-platform
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ai-risk-platform
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

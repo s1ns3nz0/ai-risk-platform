@@ -1,0 +1,27 @@
+# Example Ingress — adjust to your controller (nginx, ALB, gce, etc).
+# TLS termination is at the Ingress; the pod itself speaks plain HTTP.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-risk-platform
+  namespace: ai-risk-platform
+  annotations:
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+    # nginx.ingress.kubernetes.io/proxy-body-size: 16m  # match server's --max-body-mb
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - ai-risk.example.com
+      secretName: ai-risk-platform-tls
+  rules:
+    - host: ai-risk.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ai-risk-platform
+                port:
+                  number: 80

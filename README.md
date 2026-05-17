@@ -128,6 +128,22 @@ docker run --rm -p 8000:8000 \
 The default image runs **import-only** (no scanners baked in). Layer in
 semgrep/grype/gitleaks/checkov if you need `scan-assess`.
 
+### Kubernetes
+
+See [docs/DEPLOY.md](docs/DEPLOY.md) for the full walkthrough. Quick start:
+
+```bash
+# Edit secret + product configs.
+cp deploy/kubernetes/10-secret.example.yaml deploy/kubernetes/10-secret.yaml
+cp deploy/kubernetes/11-configmap-products.example.yaml deploy/kubernetes/11-configmap-products.yaml
+
+# Apply.
+kubectl apply -f deploy/kubernetes/00-namespace.yaml
+kubectl apply -f deploy/kubernetes/10-secret.yaml
+kubectl apply -f deploy/kubernetes/11-configmap-products.yaml
+kubectl apply -k deploy/kubernetes/
+```
+
 ### Example call
 
 ```bash
