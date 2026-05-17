@@ -68,9 +68,9 @@ class POAMItem:
 class AuthorizationDecision:
     """RMF Step 6 authorization decision."""
 
-    decision: str  # "ATO" / "DATO" / "ATO-with-conditions"
+    decision: str  # "ATO" or "DATO" — binary for CI/CD automation
     risk_level: str  # overall risk from SP 800-30
-    conditions: list[str]  # POA&M items required for ATO-with-conditions
+    conditions: list[str]  # informational POA&M / override remediation items
     authorizer: str  # "automated-gate" or role
     timestamp: str
     valid_until: str  # re-authorization date
@@ -183,11 +183,14 @@ class POAMGenerator:
 class AuthorizationEngine:
     """RMF Step 6 authorization decision.
 
-    Maps:
-    - Gate PASS + no open POA&M + no overrides -> ATO
+    Binary outcome for automation:
+    - Gate PASS  -> ATO   (remediation deadlines tracked separately in POA&M)
     - Gate BLOCK -> DATO
-    - Gate PASS + open POA&M items -> ATO-with-conditions
-    - Gate PASS + override active -> ATO-with-conditions
+
+    `ATO-with-conditions` was intentionally retired: a CI/CD gate needs a
+    strict pass/fail signal. Open POA&M items and active overrides are still
+    surfaced via the `conditions` field so the SAR and downstream tooling can
+    show remediation work, but they do not change the top-level decision.
     """
 
     def decide(
@@ -212,16 +215,14 @@ class AuthorizationEngine:
                 reasoning=f"Gate blocked: {gate_decision.reason}",
             )
 
+        # Gate PASS -> ATO. Surface open POA&M items + active overrides as
+        # informational `conditions` (not gates).
         conditions: list[str] = []
-
-        # Open POA&M items -> conditions
-        open_items = [p for p in poam_items if p.status in ("open", "in-progress")]
-        for item in open_items:
-            conditions.append(
-                f"{item.id}: {item.weakness} (deadline: {item.scheduled_completion})"
-            )
-
-        # Active overrides -> conditions
+        for item in poam_items:
+            if item.status in ("open", "in-progress"):
+                conditions.append(
+                    f"{item.id}: {item.weakness} (deadline: {item.scheduled_completion})"
+                )
         if overrides:
             for ovr in overrides:
                 ovr_id = ovr.get("id", "unknown")
@@ -230,22 +231,18 @@ class AuthorizationEngine:
                 )
 
         if conditions:
-            return AuthorizationDecision(
-                decision="ATO-with-conditions",
-                risk_level="conditionally-acceptable",
-                conditions=conditions,
-                authorizer="automated-gate",
-                timestamp=now.isoformat(),
-                valid_until=valid_until,
-                reasoning="Gate passed but open POA&M items or active overrides require remediation",
+            reasoning = (
+                f"Gate passed; {len(conditions)} remediation item(s) tracked in POA&M"
             )
+        else:
+            reasoning = "Gate passed; no open POA&M items"
 
         return AuthorizationDecision(
             decision="ATO",
             risk_level="acceptable",
-            conditions=[],
+            conditions=conditions,
             authorizer="automated-gate",
             timestamp=now.isoformat(),
             valid_until=valid_until,
-            reasoning="Gate passed with no outstanding risks",
+            reasoning=reasoning,
         )

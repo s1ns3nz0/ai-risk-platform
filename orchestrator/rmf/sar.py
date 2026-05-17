@@ -55,7 +55,7 @@ class SecurityAssessmentReport:
 
     # Overall determination
     overall_risk: str  # "acceptable" / "unacceptable"
-    authorization_recommendation: str  # "ATO" / "DATO" / "ATO-with-conditions"
+    authorization_recommendation: str  # "ATO" or "DATO"
 
 
 class SARGenerator:

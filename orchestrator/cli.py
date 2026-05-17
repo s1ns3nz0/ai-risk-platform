@@ -408,7 +408,7 @@ def risk_assess(target_path: str, product: str, trigger: str, output: str, fmt: 
     1. SP 800-30 Risk Assessment Report
     2. Security Assessment Report (SAR)
     3. Plan of Action & Milestones (POA&M)
-    4. Authorization Decision (ATO/DATO/ATO-with-conditions)
+    4. Authorization Decision (ATO/DATO)
     """
     import json as json_mod
     from dataclasses import asdict

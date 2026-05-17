@@ -173,8 +173,10 @@ def test_gate_block_dato() -> None:
     assert decision.risk_level == "unacceptable"
 
 
-def test_gate_pass_with_poam_ato_conditions() -> None:
-    """Gate PASS + open POA&M items -> ATO-with-conditions."""
+def test_gate_pass_with_poam_returns_ato_with_conditions_attached() -> None:
+    """Gate PASS + open POA&M items -> ATO (binary outcome for CI/CD).
+    POA&M items are still surfaced in the `conditions` field as
+    informational remediation tracking, but don't change the decision."""
     engine = AuthorizationEngine()
     gate = _make_gate_decision(passed=True)
 
@@ -202,13 +204,16 @@ def test_gate_pass_with_poam_ato_conditions() -> None:
         poam_items=poam_items,
     )
 
-    assert decision.decision == "ATO-with-conditions"
+    assert decision.decision == "ATO"
+    assert decision.risk_level == "acceptable"
+    # Conditions still populated for SAR / POA&M visibility.
     assert len(decision.conditions) > 0
     assert "POAM-2026-0503-001" in decision.conditions[0]
 
 
-def test_override_creates_conditional_poam() -> None:
-    """Override present -> ATO-with-conditions + linked POA&M."""
+def test_override_present_still_returns_ato_with_condition_tracked() -> None:
+    """Active override -> ATO (gate already accepted). The override is
+    listed in conditions so the SAR shows the SLA deadline."""
     engine = AuthorizationEngine()
     gate = _make_gate_decision(passed=True)
 
@@ -228,5 +233,29 @@ def test_override_creates_conditional_poam() -> None:
         overrides=overrides,
     )
 
-    assert decision.decision == "ATO-with-conditions"
+    assert decision.decision == "ATO"
     assert any("OVR-2026-0503-001" in c for c in decision.conditions)
+
+
+def test_decision_is_binary_only() -> None:
+    """No code path may produce anything other than ATO or DATO."""
+    engine = AuthorizationEngine()
+
+    # Block path.
+    blocked = engine.decide(_make_gate_decision(passed=False), poam_items=[])
+    assert blocked.decision == "DATO"
+
+    # Pass path, clean.
+    clean = engine.decide(_make_gate_decision(passed=True), poam_items=[])
+    assert clean.decision == "ATO"
+    assert clean.conditions == []
+
+    # Pass path with POA&M.
+    poam = POAMItem(
+        id="P-1", weakness="w", control_id="c", source="s", finding_id="f",
+        severity="medium", risk_level="medium", status="open", milestones=[],
+        scheduled_completion="2026-01-01", responsible="r", cost_estimate="low",
+        finding_evidence="e", override_id="",
+    )
+    dirty = engine.decide(_make_gate_decision(passed=True), poam_items=[poam])
+    assert dirty.decision == "ATO"  # still binary

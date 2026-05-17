@@ -201,11 +201,14 @@ def _make_poam_items() -> list[POAMItem]:
     ]
 
 
-def _make_authorization(decision: str = "DATO") -> AuthorizationDecision:
+def _make_authorization(decision: str = "DATO", with_conditions: bool = False) -> AuthorizationDecision:
+    """decision is binary ATO/DATO. `with_conditions=True` attaches a sample
+    POA&M entry to the conditions list (only informational under the binary
+    outcome model)."""
     return AuthorizationDecision(
         decision=decision,
         risk_level="unacceptable" if decision == "DATO" else "acceptable",
-        conditions=[] if decision != "ATO-with-conditions" else ["POAM-2026-0503-001: resolve"],
+        conditions=["POAM-2026-0503-001: resolve"] if with_conditions else [],
         authorizer="automated-gate",
         timestamp="2026-05-03T12:00:00Z",
         valid_until="2026-08-01",
