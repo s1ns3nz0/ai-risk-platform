@@ -30,6 +30,115 @@ python -m orchestrator risk-assess /path/to/your/app \
   --output output
 ```
 
+## API Server Mode
+
+For long-lived deployment (e.g. a pod that CI calls into), run the platform as
+an HTTP service so controls baselines, Bedrock clients, and EPSS connections
+are loaded **once at boot** instead of on every CI run.
+
+```bash
+pip install -e '.[server]'
+
+# Auth on, scan-mode disabled (import-only)
+ORCHESTRATOR_API_KEY=$(openssl rand -hex 32) \
+  python -m orchestrator serve --host 0.0.0.0 --port 8000
+
+# With scan-mode (server runs scanners on mounted workspaces)
+ORCHESTRATOR_API_KEY=... \
+  python -m orchestrator serve \
+    --scan-roots /mnt/workspaces:/mnt/repos
+```
+
+### Endpoints
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| GET    | `/healthz`                                | Liveness (open) |
+| GET    | `/readyz`                                 | Readiness (open) |
+| GET    | `/v1/products`                            | List configured products |
+| GET    | `/v1/products/{name}`                     | Product summary |
+| POST   | `/v1/products/{name}/assess`              | Import scanner results, return assessment |
+| POST   | `/v1/products/{name}/scan-assess`         | Run scanners on a path under `--scan-roots`, then assess |
+| GET    | `/v1/jobs/{job_id}`                       | Poll an async job |
+| POST   | `/v1/admin/reload`                        | Re-read controls + products from disk |
+
+All `/v1/*` routes require `X-API-Key: $ORCHESTRATOR_API_KEY` when the env var is set.
+
+### Sync vs async
+
+- **Static mode** (no `BEDROCK_MODEL_ID`): assessments take <1s — sync responses are fine.
+- **Bedrock mode**: per-finding AI calls take minutes. The server **requires** `async_mode: true` and returns a `202` with a `job_id`. Poll `/v1/jobs/{id}`.
+
+### Job backends (single vs multi-replica)
+
+| Backend | Survives restart? | Cross-replica polling? | Cross-replica execution? | Deps |
+| ------- | ----------------- | ---------------------- | ------------------------ | ---- |
+| `inprocess` (default) | No  | No  | No  | none |
+| `sqlite` | Yes (one pod or shared PVC) | Yes, if PVC shared | No (pod-local) | none |
+| `redis`  | Yes | Yes | **Yes** | Redis |
+
+For ≥2 replicas behind a Service, use Redis:
+
+```bash
+python -m orchestrator serve \
+  --job-backend redis --redis-url redis://redis.svc:6379/0 \
+  --replica-id $POD_NAME --worker-concurrency 4
+```
+
+Each replica runs N worker threads that `BRPOPLPUSH` from a shared queue, so
+work fans out across the cluster. On startup each replica reclaims anything
+stranded in its own `processing:{replica-id}` list (recovers from prior crash).
+
+Cross-replica recovery is handled by a **janitor** that runs on every replica:
+
+- Each replica refreshes `heartbeat:{replica-id}` on a ticker (TTL `--heartbeat-ttl`, default 60s).
+- A janitor sweep (every `--janitor-interval`, default 30s) scans `processing:*` keys.
+- When a replica's heartbeat key has expired, the janitor drains its processing
+  list, increments each descriptor's `attempts`, and pushes it back onto the
+  shared queue — any live replica can pick it up next.
+- After `--janitor-max-attempts` (default 3) the job is marked `failed` with
+  `error_class: MaxRetriesExceeded`.
+- Coordination via a `SET NX EX` lock so only one replica sweeps at a time
+  (compare-and-delete release uses `WATCH/MULTI/EXEC`).
+- Re-execution semantics are **at-least-once** — handlers should be idempotent.
+
+### Environment variables
+
+| Var | Purpose |
+| --- | ------- |
+| `ORCHESTRATOR_API_KEY`     | Enables auth on `/v1/*`. Strongly recommended. |
+| `ORCHESTRATOR_SCAN_ROOTS`  | Colon-separated allowlist for `scan-assess` targets. |
+| `ORCHESTRATOR_CORS_ORIGINS`| Comma-separated CORS origins. Off by default. |
+| `ORCHESTRATOR_JOB_DB`      | SQLite path for `--job-backend sqlite`. |
+| `ORCHESTRATOR_REDIS_URL`   | Redis URL for `--job-backend redis`. |
+| `BEDROCK_MODEL_ID`         | Enables AI mode. |
+| `AWS_DEFAULT_REGION`       | Bedrock region (default `ap-northeast-1`). |
+
+### Docker
+
+```bash
+docker build -t ai-risk-platform .
+
+docker run --rm -p 8000:8000 \
+  -e ORCHESTRATOR_API_KEY=$(openssl rand -hex 32) \
+  -v $(pwd)/controls/products:/app/controls/products:ro \
+  ai-risk-platform
+```
+
+The default image runs **import-only** (no scanners baked in). Layer in
+semgrep/grype/gitleaks/checkov if you need `scan-assess`.
+
+### Example call
+
+```bash
+curl -X POST http://localhost:8000/v1/products/payment-api/assess \
+  -H "X-API-Key: $ORCHESTRATOR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d @semgrep-results-wrapped.json
+```
+
+Where the body is `{"results": [{"scanner": "semgrep", "content": <semgrep-json>}, ...]}`.
+
 ## Integration with Your CI/CD
 
 Add to any project's GitHub Actions workflow:

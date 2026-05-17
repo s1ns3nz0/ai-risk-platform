@@ -34,16 +34,12 @@ _SIGNATURES: dict[str, list[str]] = {
 }
 
 
-def detect_scanner(file_path: str) -> str | None:
-    """Detect which scanner produced a result file."""
-    try:
-        with open(file_path) as f:
-            raw = f.read(8192)  # Read first 8KB for detection
-        data = json.loads(raw if raw.strip().startswith("{") else "[" + raw.split("[", 1)[-1])
-    except (json.JSONDecodeError, FileNotFoundError):
-        return None
+def detect_scanner_from_content(data: object) -> str | None:
+    """Detect scanner type from parsed JSON content (object or array).
 
-    # Check if it's a bare array (gitleaks format)
+    Single source of truth for inline (HTTP body) and file-based detection.
+    """
+    # Bare array → gitleaks format
     if isinstance(data, list):
         if data and isinstance(data[0], dict) and "RuleID" in data[0]:
             return "gitleaks"
@@ -52,16 +48,26 @@ def detect_scanner(file_path: str) -> str | None:
     if not isinstance(data, dict):
         return None
 
-    # Check signatures
     for scanner, keys in _SIGNATURES.items():
         if keys and all(k in data for k in keys):
             return scanner
 
-    # SARIF detection (check FIRST — SARIF is the universal format)
+    # SARIF — universal format
     if data.get("version") == "2.1.0" or "sarif" in str(data.get("$schema", "")):
         return "sarif"
 
     return None
+
+
+def detect_scanner(file_path: str) -> str | None:
+    """Detect which scanner produced a result file."""
+    try:
+        with open(file_path) as f:
+            raw = f.read(8192)  # Read first 8KB for detection
+        data = json.loads(raw if raw.strip().startswith("{") else "[" + raw.split("[", 1)[-1])
+    except (json.JSONDecodeError, FileNotFoundError):
+        return None
+    return detect_scanner_from_content(data)
 
 
 def parse_results_file(

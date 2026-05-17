@@ -1328,3 +1328,189 @@ def _build_scanners(mapper: ControlMapper) -> list:  # type: ignore[type-arg]
         GrypeScanner(mapper),
         GitleaksScanner(mapper),
     ]
+
+
+@cli.command()
+@click.option("--host", default="0.0.0.0", help="Bind host (default 0.0.0.0).")
+@click.option("--port", default=8000, type=int, help="Bind port (default 8000).")
+@click.option("--controls-dir", default=None, help="Directory of controls baselines.")
+@click.option("--tier-mappings", default=None, help="Path to tier-mappings.yaml.")
+@click.option("--products-dir", default=None, help="Directory containing product configs.")
+@click.option("--rego-dir", default=None, help="OPA Rego gates directory.")
+@click.option(
+    "--scan-roots",
+    default=None,
+    help="Colon-separated allowlist of paths /scan-assess may target. "
+    "Falls back to ORCHESTRATOR_SCAN_ROOTS env. Scan-mode is disabled when empty.",
+)
+@click.option(
+    "--max-body-mb",
+    default=16,
+    type=int,
+    help="Maximum request body size in megabytes (default 16).",
+)
+@click.option(
+    "--cors-origins",
+    default=None,
+    help="Comma-separated CORS allow-origins. Falls back to ORCHESTRATOR_CORS_ORIGINS. "
+    "Off by default (pod-internal use).",
+)
+@click.option(
+    "--job-backend",
+    default="inprocess",
+    type=click.Choice(["inprocess", "sqlite", "redis"]),
+    help="Job storage. 'sqlite' = restart-durable, single pod. 'redis' = cross-replica state + work pickup.",
+)
+@click.option(
+    "--job-db",
+    default=None,
+    help="SQLite path for --job-backend=sqlite. Falls back to ORCHESTRATOR_JOB_DB.",
+)
+@click.option(
+    "--redis-url",
+    default=None,
+    help="Redis URL for --job-backend=redis. Falls back to ORCHESTRATOR_REDIS_URL.",
+)
+@click.option(
+    "--replica-id",
+    default=None,
+    help="Override replica id (default: hostname). Used for processing-list key.",
+)
+@click.option(
+    "--worker-concurrency",
+    default=2,
+    type=int,
+    help="Number of worker threads per replica when --job-backend=redis.",
+)
+@click.option(
+    "--janitor/--no-janitor",
+    default=True,
+    help="Enable the janitor that reclaims work from dead replicas (redis backend only).",
+)
+@click.option(
+    "--janitor-interval",
+    default=30.0,
+    type=float,
+    help="Seconds between janitor sweeps (default 30).",
+)
+@click.option(
+    "--janitor-max-attempts",
+    default=3,
+    type=int,
+    help="Mark job failed after N requeue attempts (default 3).",
+)
+@click.option(
+    "--heartbeat-ttl",
+    default=60,
+    type=int,
+    help="Seconds before this replica is considered dead if it stops sending heartbeats.",
+)
+@click.option("--reload/--no-reload", default=False, help="Enable uvicorn auto-reload (dev).")
+def serve(
+    host: str,
+    port: int,
+    controls_dir: str | None,
+    tier_mappings: str | None,
+    products_dir: str | None,
+    rego_dir: str | None,
+    scan_roots: str | None,
+    max_body_mb: int,
+    cors_origins: str | None,
+    job_backend: str,
+    job_db: str | None,
+    redis_url: str | None,
+    replica_id: str | None,
+    worker_concurrency: int,
+    janitor: bool,
+    janitor_interval: float,
+    janitor_max_attempts: int,
+    heartbeat_ttl: int,
+    reload: bool,
+) -> None:
+    """Run the HTTP API server.
+
+    Requires the [server] extra:
+      pip install -e .[server]
+
+    Auth: set ORCHESTRATOR_API_KEY to require X-API-Key on all /v1/* routes.
+    """
+    try:
+        import uvicorn
+    except ImportError:
+        click.echo("Error: server extras not installed. Run: pip install -e .[server]", err=True)
+        sys.exit(1)
+
+    from orchestrator.server.app import api_key_from_env, create_app
+    from orchestrator.server.state import ServerState
+
+    roots_raw = scan_roots or os.environ.get("ORCHESTRATOR_SCAN_ROOTS", "")
+    roots = [Path(p) for p in roots_raw.split(":") if p.strip()] if roots_raw else []
+
+    state = ServerState(
+        controls_dir=Path(controls_dir or _default_path("controls/baselines")),
+        tier_mappings_path=Path(tier_mappings or _default_path("controls/tier-mappings.yaml")),
+        products_dir=Path(products_dir or _default_path("controls/products")),
+        rego_dir=Path(rego_dir or _default_path("rego/gates")),
+        scan_roots=roots,
+    )
+    state.load()
+    api_key = api_key_from_env()
+    click.echo(f"[serve] Loaded {len(state.list_products())} products | mode={state.clients.mode}")
+    if api_key:
+        click.echo("[serve] Auth: ENABLED (X-API-Key required on /v1/*)")
+    else:
+        click.echo("[serve] Auth: DISABLED — set ORCHESTRATOR_API_KEY to require X-API-Key")
+    if roots:
+        click.echo(f"[serve] Scan roots: {', '.join(str(r) for r in roots)}")
+    else:
+        click.echo("[serve] Scan-mode DISABLED (no --scan-roots configured)")
+    click.echo(f"[serve] Listening on http://{host}:{port}")
+
+    cors_raw = cors_origins or os.environ.get("ORCHESTRATOR_CORS_ORIGINS", "")
+    cors_list = [o.strip() for o in cors_raw.split(",") if o.strip()] or None
+    if cors_list:
+        click.echo(f"[serve] CORS allow-origins: {', '.join(cors_list)}")
+
+    backend = None
+    if job_backend == "sqlite":
+        from orchestrator.server.jobs import SqliteBackend
+
+        path = job_db or os.environ.get("ORCHESTRATOR_JOB_DB")
+        if not path:
+            click.echo("Error: --job-backend=sqlite requires --job-db or ORCHESTRATOR_JOB_DB", err=True)
+            sys.exit(1)
+        backend = SqliteBackend(path)
+        click.echo(f"[serve] Job backend: sqlite ({path})")
+    elif job_backend == "redis":
+        from orchestrator.server.jobs import RedisBackend
+
+        url = redis_url or os.environ.get("ORCHESTRATOR_REDIS_URL")
+        if not url:
+            click.echo("Error: --job-backend=redis requires --redis-url or ORCHESTRATOR_REDIS_URL", err=True)
+            sys.exit(1)
+        backend = RedisBackend(url=url)
+        click.echo(f"[serve] Job backend: redis ({url}) — cross-replica state + work pickup")
+    else:
+        click.echo("[serve] Job backend: inprocess (jobs lost on restart)")
+
+    if job_backend == "redis":
+        click.echo(
+            f"[serve] Janitor: {'ON' if janitor else 'OFF'} "
+            f"(interval={janitor_interval}s, max_attempts={janitor_max_attempts}, "
+            f"heartbeat_ttl={heartbeat_ttl}s)"
+        )
+
+    app = create_app(
+        state,
+        api_key=api_key,
+        max_body_bytes=max_body_mb * 1024 * 1024,
+        cors_origins=cors_list,
+        job_backend=backend,
+        worker_concurrency=worker_concurrency,
+        replica_id=replica_id,
+        enable_janitor=janitor,
+        janitor_interval=janitor_interval,
+        janitor_max_attempts=janitor_max_attempts,
+        heartbeat_ttl=heartbeat_ttl,
+    )
+    uvicorn.run(app, host=host, port=port, reload=reload)
