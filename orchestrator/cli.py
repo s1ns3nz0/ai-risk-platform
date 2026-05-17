@@ -558,6 +558,10 @@ def risk_assess(target_path: str, product: str, trigger: str, output: str, fmt: 
         findings=findings,
         risk_report=sp800_report,
         gate_decision=gate,
+        manifest=manifest,
+        enriched_vulns=enriched_vulns,
+        trigger=trigger,
+        evidence_url=os.environ.get("ORCHESTRATOR_EVIDENCE_URL", ""),
     )
 
     deadline_counts: dict[str, int] = {}
@@ -1256,7 +1260,15 @@ def import_assess(
     sar = sar_gen.generate(product=product, findings=findings, gate_decision=gate, risk_report=sp800_report)
 
     poam_gen = POAMGenerator()
-    poam_items = poam_gen.generate(findings=findings, risk_report=sp800_report, gate_decision=gate)
+    poam_items = poam_gen.generate(
+        findings=findings,
+        risk_report=sp800_report,
+        gate_decision=gate,
+        manifest=manifest,
+        enriched_vulns=enriched_vulns,
+        trigger=trigger,
+        evidence_url=os.environ.get("ORCHESTRATOR_EVIDENCE_URL", ""),
+    )
 
     auth_engine = AuthorizationEngine()
     auth_decision = auth_engine.decide(gate_decision=gate, poam_items=poam_items)

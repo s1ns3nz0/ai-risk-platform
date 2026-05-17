@@ -56,17 +56,32 @@ class ServerState:
         products_dir: Path,
         rego_dir: Path,
         scan_roots: list[Path] | None = None,
+        assessments_dir: Path | None = None,
     ) -> None:
         self._controls_dir = controls_dir
         self._tier_mappings_path = tier_mappings_path
         self._products_dir = products_dir
         self.rego_dir = rego_dir
         self.scan_roots = [r.resolve() for r in (scan_roots or [])]
+        # Default to products_dir so the on-disk layout matches the existing
+        # CLI convention (<product>/risk-assessments/*.json).
+        self.assessments_dir = (assessments_dir or products_dir).resolve()
 
         self._lock = threading.RLock()
         self._repo: ControlsRepository | None = None
         self._products: dict[str, ProductConfig] = {}
         self._clients: SharedClients | None = None
+        self._store: Any = None
+
+    @property
+    def store(self) -> Any:
+        """Lazy-initialised persistence store. Mount the assessments_dir as a
+        PVC for multi-replica deployments."""
+        with self._lock:
+            if self._store is None:
+                from orchestrator.persistence import AssessmentStore
+                self._store = AssessmentStore(self.assessments_dir)
+            return self._store
 
     # --- lifecycle ---
 

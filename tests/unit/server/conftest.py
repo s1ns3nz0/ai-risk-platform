@@ -23,6 +23,9 @@ def server_state(tmp_path: Path) -> ServerState:
         products_dir=_REPO_ROOT / "examples",
         rego_dir=_REPO_ROOT / "rego" / "gates",
         scan_roots=[tmp_path],
+        # Isolate persisted assessments under tmp_path so tests don't write
+        # into the bundled examples/ directory.
+        assessments_dir=tmp_path / "assessments",
     )
     state.load()
     return state

@@ -34,6 +34,20 @@ def test_zero_findings_is_a_clean_scan_not_an_error(client):
     assert body["gate"]["passed"] is True
 
 
+def test_evidence_url_lands_on_every_poam_item(client, semgrep_payload):
+    """evidence_url from the request must propagate to source_detail.evidence_url
+    on every generated POA&M item — that's what links remediation tickets
+    back to the originating CI run."""
+    url = "https://github.com/acme/payment-api/actions/runs/12345"
+    semgrep_payload["evidence_url"] = url
+    r = client.post("/v1/products/payment-api/assess", json=semgrep_payload)
+    assert r.status_code == 200
+    items = r.json()["poam"]["items"]
+    assert items, "expected at least one POA&M item"
+    for item in items:
+        assert item["source_detail"]["evidence_url"] == url
+
+
 def test_authorization_decision_is_binary_ato_or_dato(client, semgrep_payload):
     """The /assess endpoint must only ever report decision=ATO or =DATO.
     `ATO-with-conditions` was retired because CI/CD needs strict binary."""

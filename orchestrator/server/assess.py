@@ -47,9 +47,13 @@ class AssessmentResult:
     authorization: Any
     mode: str
     duration_seconds: float
+    assessment_id: str = ""
+    created_at: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            "assessment_id": self.assessment_id,
+            "created_at": self.created_at,
             "product": self.product,
             "tier": self.tier,
             "mode": self.mode,
@@ -81,6 +85,9 @@ def run_assessment(
     rego_dir: str,
     trigger: str = "pre_merge",
     progress_callback: Callable[[int, int, str], None] | None = None,
+    evidence_url: str = "",
+    sbom: dict[str, Any] | None = None,
+    store: Any = None,
 ) -> AssessmentResult:
     """Run gate + SP 800-30 + SAR + POA&M + authorization on a finding list."""
     t0 = time.monotonic()
@@ -125,11 +132,46 @@ def run_assessment(
         product=product, findings=tagged, gate_decision=gate, risk_report=sp800_report,
     )
     poam_items = POAMGenerator().generate(
-        findings=tagged, risk_report=sp800_report, gate_decision=gate,
+        findings=tagged,
+        risk_report=sp800_report,
+        gate_decision=gate,
+        manifest=manifest,
+        enriched_vulns=enriched_vulns,
+        trigger=trigger,
+        evidence_url=evidence_url,
+        sbom=sbom,
     )
+
+    # Bedrock-only: replace static templates with model-generated text on
+    # weakness.description, impact.business_impact, remediation.*, milestones.
+    # Failures fall back to the static text already in place.
+    if clients.mode == "bedrock" and poam_items:
+        try:
+            from orchestrator.assessor.bedrock_client import BedrockClient
+            from orchestrator.rmf.poam_ai import BedrockPOAMEnricher
+
+            bc = getattr(clients.pipeline, "_bedrock", None) or getattr(
+                clients.assessor, "_client", None,
+            )
+            if isinstance(bc, BedrockClient):
+                stats = BedrockPOAMEnricher(bc).enrich(poam_items)
+                logger.info(
+                    "poam_ai enriched=%d failed=%d", stats["enriched"], stats["failed"],
+                )
+        except Exception as exc:
+            logger.warning("poam_ai skipped: %s", exc)
+
     authorization = AuthorizationEngine().decide(gate_decision=gate, poam_items=poam_items)
 
-    return AssessmentResult(
+    # Stamp the result with a stable id + timestamp before serialization so
+    # callers can correlate and the persistence layer can index by id.
+    from datetime import datetime, timezone
+    assessment_id = ""
+    created_at = datetime.now(timezone.utc).isoformat()
+    if store is not None:
+        assessment_id = store.new_id()
+
+    result = AssessmentResult(
         product=product,
         tier=tier.value,
         findings=tagged,
@@ -140,7 +182,37 @@ def run_assessment(
         authorization=authorization,
         mode=clients.mode,
         duration_seconds=time.monotonic() - t0,
+        assessment_id=assessment_id,
+        created_at=created_at,
     )
+
+    if store is not None:
+        from orchestrator.persistence import AssessmentRecord
+        try:
+            store.save(AssessmentRecord(
+                id=assessment_id,
+                product=product,
+                created_at=created_at,
+                payload=result.to_dict(),
+            ))
+        except Exception as exc:
+            logger.exception("failed to persist assessment %s: %s", assessment_id, exc)
+        else:
+            # Best-effort: close out POA&M items in the previous run that
+            # don't appear here. Failure of reconciliation must not abort
+            # the assessment response.
+            try:
+                from orchestrator.rmf.reconciler import reconcile_against_previous
+                stats = reconcile_against_previous(store, product, assessment_id)
+                if stats["previous_id"]:
+                    logger.info(
+                        "reconcile against %s closed=%d still_open=%d",
+                        stats["previous_id"], stats["closed"], stats["still_open"],
+                    )
+            except Exception as exc:
+                logger.warning("reconciliation skipped: %s", exc)
+
+    return result
 
 
 def run_scanners(target_path: str, controls_repo: ControlsRepository) -> list[Finding]:
@@ -176,6 +248,8 @@ def _tagged(finding: Finding, product: str) -> Finding:
         package=finding.package,
         installed_version=finding.installed_version,
         fixed_version=finding.fixed_version,
+        cvss_score=finding.cvss_score,
+        cwe_ids=list(finding.cwe_ids),
     )
 
 

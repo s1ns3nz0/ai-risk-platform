@@ -46,7 +46,10 @@ from orchestrator.server.jobs import (
     WorkerLoop,
 )
 from orchestrator.server.models import (
+    AssessmentListResponse,
     AssessmentResponse,
+    AssessmentSummary,
+    DelayUpdate,
     HealthResponse,
     ImportAssessRequest,
     JobAccepted,
@@ -55,8 +58,11 @@ from orchestrator.server.models import (
     ProductSummary,
     ReadyResponse,
     ReloadResponse,
+    RiskAcceptanceUpdate,
     ScanAssessRequest,
     ScannerResultPayload,
+    TicketUpdate,
+    VerificationUpdate,
 )
 from orchestrator.server.state import ServerState
 from orchestrator.types import Finding
@@ -249,6 +255,8 @@ def create_app(
                 "type": "import-assess",
                 "product": name,
                 "trigger": req.trigger,
+                "evidence_url": req.evidence_url,
+                "sbom": req.sbom,
                 "findings": [asdict(f) for f in findings],
             }
             return _accept_distributed(jobs, descriptor)
@@ -264,6 +272,9 @@ def create_app(
                 clients=state.clients,
                 rego_dir=str(state.rego_dir),
                 trigger=req.trigger,
+                evidence_url=req.evidence_url,
+                sbom=req.sbom,
+                store=state.store,
             )
         return _run_sync_or_async(_do, async_mode=req.async_mode, jobs=jobs)
 
@@ -314,6 +325,7 @@ def create_app(
                 clients=state.clients,
                 rego_dir=str(state.rego_dir),
                 trigger=req.trigger,
+                store=state.store,
             )
         return _run_sync_or_async(_do, async_mode=req.async_mode, jobs=jobs)
 
@@ -335,6 +347,84 @@ def create_app(
             error_id=job.error_id,
             error_class=job.error_class,
         )
+
+    # ---------------- persisted assessments ----------------
+
+    @app.get(
+        "/v1/products/{name}/assessments",
+        response_model=AssessmentListResponse,
+        dependencies=auth,
+    )
+    def list_assessments(name: str) -> AssessmentListResponse:
+        _get_product_or_404(state, name)
+        items = state.store.list_for_product(name)
+        return AssessmentListResponse(
+            assessments=[AssessmentSummary(**item) for item in items],
+        )
+
+    @app.get(
+        "/v1/products/{name}/assessments/{assessment_id}",
+        dependencies=auth,
+    )
+    def get_assessment(name: str, assessment_id: str) -> Any:
+        _get_product_or_404(state, name)
+        record = state.store.get(name, assessment_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail="assessment not found")
+        return record.to_dict()
+
+    def _patch_poam(
+        name: str, assessment_id: str, poam_id: str, section: str, values: dict[str, Any],
+    ) -> Any:
+        _get_product_or_404(state, name)
+        try:
+            record = state.store.update_poam_section(
+                product=name,
+                assessment_id=assessment_id,
+                poam_id=poam_id,
+                section=section,
+                values=values,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
+        if record is None:
+            raise HTTPException(status_code=404, detail="assessment or poam item not found")
+        # Return just the updated POA&M item so the caller doesn't have to
+        # parse the whole assessment.
+        items = record.payload.get("poam", {}).get("items", [])
+        return next((it for it in items if it.get("id") == poam_id), {})
+
+    @app.post(
+        "/v1/products/{name}/assessments/{assessment_id}/poam/{poam_id}/ticket",
+        dependencies=auth,
+    )
+    def attach_ticket(name: str, assessment_id: str, poam_id: str, req: TicketUpdate) -> Any:
+        return _patch_poam(name, assessment_id, poam_id, "ticket", req.model_dump())
+
+    @app.post(
+        "/v1/products/{name}/assessments/{assessment_id}/poam/{poam_id}/delay",
+        dependencies=auth,
+    )
+    def attach_delay(name: str, assessment_id: str, poam_id: str, req: DelayUpdate) -> Any:
+        return _patch_poam(name, assessment_id, poam_id, "delay", req.model_dump())
+
+    @app.post(
+        "/v1/products/{name}/assessments/{assessment_id}/poam/{poam_id}/risk-acceptance",
+        dependencies=auth,
+    )
+    def attach_risk_acceptance(
+        name: str, assessment_id: str, poam_id: str, req: RiskAcceptanceUpdate,
+    ) -> Any:
+        return _patch_poam(name, assessment_id, poam_id, "risk_acceptance", req.model_dump())
+
+    @app.post(
+        "/v1/products/{name}/assessments/{assessment_id}/poam/{poam_id}/verification",
+        dependencies=auth,
+    )
+    def attach_verification(
+        name: str, assessment_id: str, poam_id: str, req: VerificationUpdate,
+    ) -> Any:
+        return _patch_poam(name, assessment_id, poam_id, "verification", req.model_dump())
 
     # ---------------- admin ----------------
 
@@ -388,6 +478,9 @@ def _build_handlers(state: ServerState) -> dict[str, Any]:
             clients=state.clients,
             rego_dir=str(state.rego_dir),
             trigger=descriptor.get("trigger", "pre_merge"),
+            evidence_url=descriptor.get("evidence_url", ""),
+            sbom=descriptor.get("sbom"),
+            store=state.store,
         )
 
     def scan_assess(descriptor: dict[str, Any]) -> AssessmentResult:
@@ -405,6 +498,8 @@ def _build_handlers(state: ServerState) -> dict[str, Any]:
             clients=state.clients,
             rego_dir=str(state.rego_dir),
             trigger=descriptor.get("trigger", "pre_merge"),
+            evidence_url=descriptor.get("evidence_url", ""),
+            store=state.store,
         )
 
     return {"import-assess": import_assess, "scan-assess": scan_assess}

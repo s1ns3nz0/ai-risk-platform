@@ -55,10 +55,13 @@ class Finding:
     message: str
     control_ids: list[str]
     product: str
-    # SCA-specific fields (populated by Grype, empty for other scanners)
+    # SCA-specific fields (populated by Grype/Trivy, empty for other scanners)
     package: str = ""
     installed_version: str = ""
     fixed_version: str = ""
+    cvss_score: float | None = None
+    # CWE references when the scanner emits them (Trivy.CweIDs, Grype.vulnerability.cwes).
+    cwe_ids: list[str] = field(default_factory=list)
 
 
 def is_secret_finding(f: Finding) -> bool:

@@ -141,6 +141,30 @@ class GrypeScanner:
             effective_id = cve_id if cve_id else vuln_id
             control_ids = self._control_mapper.map_finding("grype", effective_id, severity=severity)
 
+            # Pull baseScore from the first cvss entry (prefer v3.x over v2).
+            cvss_score: float | None = None
+            cvss_list = vuln.get("cvss", [])
+            if isinstance(cvss_list, list):
+                v3 = next((c for c in cvss_list if isinstance(c, dict) and str(c.get("version", "")).startswith("3")), None)
+                chosen = v3 or (cvss_list[0] if cvss_list else None)
+                if isinstance(chosen, dict):
+                    metrics = chosen.get("metrics", {})
+                    if isinstance(metrics, dict):
+                        base = metrics.get("baseScore")
+                        if isinstance(base, (int, float)):
+                            cvss_score = float(base)
+
+            # CWE references — Grype exposes them under `vulnerability.cwes`
+            # in newer versions; many older feeds carry them via
+            # relatedVulnerabilities[].cwes.
+            cwe_ids: list[str] = []
+            for src in (vuln.get("cwes"), *(rv.get("cwes") for rv in related if isinstance(rv, dict))):
+                if isinstance(src, list):
+                    for c in src:
+                        s = str(c)
+                        if s.startswith("CWE-") and s not in cwe_ids:
+                            cwe_ids.append(s)
+
             findings.append(
                 Finding(
                     source="grype",
@@ -154,6 +178,8 @@ class GrypeScanner:
                     package=pkg_name,
                     installed_version=pkg_version,
                     fixed_version=fixed_version,
+                    cvss_score=cvss_score,
+                    cwe_ids=cwe_ids,
                 )
             )
 

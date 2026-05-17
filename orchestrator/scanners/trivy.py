@@ -106,6 +106,14 @@ class TrivyScanner:
             fixed = str(v.get("FixedVersion", ""))
             message = str(v.get("Title") or v.get("Description") or rule_id)
 
+            # Trivy's CVSS is {vendor: {V3Score, V2Score, V3Vector, ...}, ...}.
+            # Prefer NVD V3Score; fall back to the first vendor's V3Score, then V2.
+            cvss_score = _pick_trivy_cvss(v.get("CVSS"))
+
+            # Trivy reliably emits CweIDs[] when NVD has the mapping.
+            cwe_ids_raw = v.get("CweIDs", [])
+            cwe_ids = [str(c) for c in cwe_ids_raw if isinstance(c, str)] if isinstance(cwe_ids_raw, list) else []
+
             # SCA-equivalent: Trivy CVE findings use the same severity-threshold
             # mapping as Grype, so reuse `grype` as the mapper key. The Finding's
             # `source` stays "trivy" for audit trail.
@@ -123,6 +131,8 @@ class TrivyScanner:
                     package=pkg,
                     installed_version=installed,
                     fixed_version=fixed,
+                    cvss_score=cvss_score,
+                    cwe_ids=cwe_ids,
                 )
             )
         return out
@@ -198,3 +208,26 @@ class TrivyScanner:
                 )
             )
         return out
+
+
+def _pick_trivy_cvss(cvss_map: Any) -> float | None:
+    """Trivy emits CVSS as {vendor: {V3Score, V2Score, V3Vector, ...}}.
+    Prefer NVD V3, then any V3, then any V2."""
+    if not isinstance(cvss_map, dict):
+        return None
+    nvd = cvss_map.get("nvd")
+    if isinstance(nvd, dict):
+        v3 = nvd.get("V3Score")
+        if isinstance(v3, (int, float)):
+            return float(v3)
+    for entry in cvss_map.values():
+        if isinstance(entry, dict):
+            v3 = entry.get("V3Score")
+            if isinstance(v3, (int, float)):
+                return float(v3)
+    for entry in cvss_map.values():
+        if isinstance(entry, dict):
+            v2 = entry.get("V2Score")
+            if isinstance(v2, (int, float)):
+                return float(v2)
+    return None

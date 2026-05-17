@@ -79,6 +79,23 @@ class ImportAssessRequest(BaseModel):
         description="Return 202 with a job ID instead of blocking. "
         "Recommended when BEDROCK_MODEL_ID is configured.",
     )
+    evidence_url: str = Field(
+        default="",
+        description=(
+            "Pipeline run URL (e.g. GitHub Actions $GITHUB_SERVER_URL/.../runs/$GITHUB_RUN_ID). "
+            "Stored on every generated POA&M item under source_detail.evidence_url so "
+            "remediation tickets can link back to the originating CI run."
+        ),
+    )
+    sbom: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "Optional CycloneDX 1.4+ SBOM (parsed JSON). When supplied, every "
+            "POA&M item whose finding has a `package` is correlated to a "
+            "component and gets a `source_detail.sbom_ref` like "
+            "`bom.json#components/pkg:maven/.../spring-core@6.1.6`."
+        ),
+    )
 
 
 class ScanAssessRequest(BaseModel):
@@ -97,6 +114,8 @@ class GateSummary(BaseModel):
 
 
 class AssessmentResponse(BaseModel):
+    assessment_id: str = ""
+    created_at: str = ""
     product: str
     tier: str
     mode: str
@@ -140,6 +159,48 @@ class JobAccepted(BaseModel):
 class ReloadResponse(BaseModel):
     products: int
     controls_baselines: int
+
+
+# ---------------- POA&M update payloads (pipeline + operator-supplied) ----------------
+
+
+class TicketUpdate(BaseModel):
+    """Pipeline-supplied after creating the GitHub Issue / Jira ticket."""
+
+    id: str = Field(description="External ticket id, e.g. SEC-202605-001")
+    url: str = Field(default="", description="Browsable ticket URL")
+
+
+class DelayUpdate(BaseModel):
+    """Operator-supplied delay justification (manual)."""
+
+    justification: str = Field(min_length=1)
+    approved_by: str = Field(min_length=1)
+
+
+class RiskAcceptanceUpdate(BaseModel):
+    """AO-supplied formal risk acceptance (manual)."""
+
+    accepted_by: str = Field(min_length=1)
+    justification: str = Field(min_length=1)
+    compensating_controls: list[str] = Field(default_factory=list)
+
+
+class VerificationUpdate(BaseModel):
+    """Who verified the remediation (auto or manual)."""
+
+    verified_by: str = Field(min_length=1, description='"automated" or person name')
+    verified_at: str = Field(default="", description="ISO 8601; auto-stamped if omitted")
+
+
+class AssessmentSummary(BaseModel):
+    id: str
+    product: str
+    created_at: str
+
+
+class AssessmentListResponse(BaseModel):
+    assessments: list[AssessmentSummary]
 
 
 class HealthResponse(BaseModel):
