@@ -41,8 +41,8 @@ logger = logging.getLogger(__name__)
 # with passed_checks/failed_checks nested under .results).
 _SIGNATURES: dict[str, list[str]] = {
     "semgrep": ["results", "errors"],                       # Semgrep JSON
-    "grype": ["matches", "descriptor"],                      # Grype JSON
-    "trivy": ["SchemaVersion", "ArtifactName", "Results"],   # Trivy native JSON
+    "grype": ["matches"],                                    # Grype JSON (descriptor may be absent in fallback CLI output)
+    "trivy": ["SchemaVersion", "Results"],                   # Trivy native JSON (ArtifactName may be missing in some versions)
     "gitleaks": [],                                          # bare array of {RuleID:...}
     "checkov": ["check_type", "results", "summary"],         # Checkov nested shape
     "zap": ["site"],                                         # ZAP JSON

@@ -142,3 +142,45 @@ class TestIsSarif:
 
     def test_invalid_json(self) -> None:
         assert is_sarif("not json") is False
+
+
+class TestToolNameNormalization:
+    """Regression: vendor-decorated SARIF tool names (e.g. Semgrep CI emits
+    `tool.driver.name = "Semgrep OSS"`) must normalize to the canonical
+    scanner key so downstream control mapping and SAR submission tracking
+    work via exact-equality checks on `Finding.source`.
+    """
+
+    def _sarif(self, tool_name: str) -> str:
+        return json.dumps({
+            "version": "2.1.0",
+            "runs": [{
+                "tool": {"driver": {"name": tool_name}},
+                "results": [{
+                    "ruleId": "r1",
+                    "level": "warning",
+                    "message": {"text": "x"},
+                    "locations": [{"physicalLocation": {
+                        "artifactLocation": {"uri": "a.py"},
+                        "region": {"startLine": 1},
+                    }}],
+                }],
+            }],
+        })
+
+    def test_semgrep_oss_with_space(self, mapper: MagicMock) -> None:
+        findings = parse_sarif(self._sarif("Semgrep OSS"), mapper)
+        assert findings[0].source == "semgrep"
+
+    def test_hadolint_capitalized(self, mapper: MagicMock) -> None:
+        findings = parse_sarif(self._sarif("Hadolint"), mapper)
+        assert findings[0].source == "hadolint"
+
+    def test_trivy_with_version_suffix(self, mapper: MagicMock) -> None:
+        findings = parse_sarif(self._sarif("Trivy 0.50.0"), mapper)
+        assert findings[0].source == "trivy"
+
+    def test_unknown_tool_slugified(self, mapper: MagicMock) -> None:
+        findings = parse_sarif(self._sarif("My Custom Scanner"), mapper)
+        # No alias hit → slugified (lowercase + space→dash), not raw string.
+        assert findings[0].source == "my-custom-scanner"

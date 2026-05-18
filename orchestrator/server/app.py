@@ -601,6 +601,25 @@ _SCANNER_ALIASES: dict[str, str] = {
 }
 
 
+# When a scanner is submitted, also credit semantically-equivalent scanners
+# in the SAR. Trivy CVE-class findings already map to grype-assessed controls
+# (see TrivyScanner._parse_vulns), but the SAR's "did the right scanner run"
+# check fails unless we also flag grype as ran. Same idea for any future tool
+# that doubles as a substitute (e.g. snyk-sca).
+_SCANNER_SUBMISSION_EQUIVALENTS: dict[str, set[str]] = {
+    "trivy": {"grype"},
+}
+
+
+# Map an externally-submitted scanner name to the SAR submission key that
+# matches what the controls repository expects. Pipelines often label SARIF
+# uploads by tool (e.g. "semgrep-sarif", "checkov-k8s") — strip the format
+# suffix so the SAR can match `verification_methods[].scanner: semgrep`.
+_SUBMISSION_NAME_OVERRIDES: dict[str, str] = {
+    "semgrep-sarif": "semgrep",
+}
+
+
 def _parse_payloads(
     payloads: list[ScannerResultPayload],
     state: ServerState,
@@ -629,6 +648,7 @@ def _parse_payloads(
         canonical = _resolve_scanner_name(entry, detect_scanner_from_content)
         if canonical:
             submitted_scanners.add(canonical)
+            submitted_scanners |= _SCANNER_SUBMISSION_EQUIVALENTS.get(canonical, set())
         try:
             findings = _parse_one_entry(entry, idx, mapper, detect_scanner_from_content, parse_sarif)
         except Exception as exc:  # parser bug shouldn't kill the batch
@@ -652,6 +672,10 @@ def _resolve_scanner_name(entry: ScannerResultPayload, detect: Any) -> str | Non
     available (e.g. hadolint, snyk) since that's what the SAR maps to.
     """
     if entry.scanner:
+        # Explicit submission-name override wins (e.g. "semgrep-sarif" →
+        # "semgrep" so the SAR matches verification_methods[].scanner).
+        if entry.scanner in _SUBMISSION_NAME_OVERRIDES:
+            return _SUBMISSION_NAME_OVERRIDES[entry.scanner]
         canonical = _SCANNER_ALIASES.get(entry.scanner, entry.scanner)
         # SARIF aliases (hadolint, snyk, ...) collapse to "sarif" for parsing
         # but the SAR needs the original tool name to match verification

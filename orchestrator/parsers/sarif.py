@@ -25,10 +25,12 @@ _LEVEL_MAP: dict[str, str] = {
     "none": "low",
 }
 
-# Well-known tool name normalization
+# Well-known tool name normalization. Keys are slug-normalized (lowercase,
+# whitespace/punctuation collapsed to "-"); see `_normalize_tool_name`.
+# Matching is substring-based so vendor-flavored variants like "Semgrep OSS",
+# "semgrep-oss", "Trivy 0.50.0" all map to the canonical scanner key.
 _TOOL_ALIASES: dict[str, str] = {
     "semgrep": "semgrep",
-    "semgrep-oss": "semgrep",
     "grype": "grype",
     "trivy": "trivy",
     "bandit": "bandit",
@@ -36,6 +38,8 @@ _TOOL_ALIASES: dict[str, str] = {
     "codeql": "codeql",
     "snyk": "snyk",
     "hadolint": "hadolint",
+    "gitleaks": "gitleaks",
+    "spotbugs": "spotbugs",
     "eslint": "eslint",
     "tfsec": "tfsec",
     "terrascan": "terrascan",
@@ -44,10 +48,29 @@ _TOOL_ALIASES: dict[str, str] = {
     "gosec": "gosec",
     "safety": "safety",
     "pip-audit": "pip-audit",
-    "npm audit": "npm-audit",
+    "npm-audit": "npm-audit",
     "bearer": "bearer",
     "megalinter": "megalinter",
 }
+
+
+def _normalize_tool_name(raw: str) -> str:
+    """Map SARIF tool.driver.name to a canonical scanner key.
+
+    Handles vendor-decorated names ("Semgrep OSS", "Trivy 0.50.0",
+    "hadolint v2.12") by lowercasing then substring-matching against the
+    alias table. Falls back to a slugified version of the raw name when no
+    alias matches.
+    """
+    if not raw:
+        return "unknown"
+    lowered = raw.lower().strip()
+    for key, canonical in _TOOL_ALIASES.items():
+        if key in lowered:
+            return canonical
+    # Slugify so multi-word tool names ("My Scanner") don't carry whitespace
+    # into Finding.source (where downstream code uses exact equality).
+    return "-".join(lowered.split())
 
 
 def parse_sarif(
@@ -83,8 +106,7 @@ def parse_sarif(
 
     for run in runs:
         tool = run.get("tool", {}).get("driver", {})
-        tool_name_raw = tool.get("name", "unknown").lower()
-        tool_name = _TOOL_ALIASES.get(tool_name_raw, tool_name_raw)
+        tool_name = _normalize_tool_name(tool.get("name", ""))
 
         # Build rule metadata index (for severity overrides and CWE mapping)
         rule_index: dict[str, dict[str, object]] = {}
