@@ -8,6 +8,10 @@ Routes:
   POST /v1/products/{name}/assess            import-mode: assess scanner results
   POST /v1/products/{name}/scan-assess       scan-mode: run scanners on a path then assess
   GET  /v1/jobs/{job_id}                     poll async assessment
+  GET  /v1/products/{name}/assessments       list persisted assessments
+  GET  /v1/products/{name}/assessments/{id}  fetch a persisted assessment
+  GET  /v1/products/{name}/assessments/{id}/by-phase
+                                             POA&M items grouped by DevSecOps phase
   POST /v1/admin/reload                      re-read controls + products from disk
 
 All /v1/* routes require `X-API-Key: $ORCHESTRATOR_API_KEY` when the env var is set.
@@ -372,6 +376,36 @@ def create_app(
         if record is None:
             raise HTTPException(status_code=404, detail="assessment not found")
         return record.to_dict()
+
+    @app.get(
+        "/v1/products/{name}/assessments/{assessment_id}/by-phase",
+        dependencies=auth,
+    )
+    def get_assessment_by_phase(name: str, assessment_id: str) -> Any:
+        """Group POA&M items by DevSecOps phase (BUILD/TEST/DEPLOY/OPERATE).
+
+        Phase is sourced from each item's `source_detail.phase`, which the
+        POA&M engine derives from the assessment trigger
+        (pre_merge→BUILD, pre_deploy→DEPLOY, periodic→OPERATE). Items with
+        an unrecognised or missing phase fall under UNKNOWN.
+        """
+        _get_product_or_404(state, name)
+        record = state.store.get(name, assessment_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail="assessment not found")
+        items = record.payload.get("poam", {}).get("items", [])
+        groups: dict[str, list[dict[str, Any]]] = {
+            "BUILD": [], "TEST": [], "DEPLOY": [], "OPERATE": [],
+        }
+        for item in items:
+            phase = ((item.get("source_detail") or {}).get("phase") or "").upper()
+            groups.setdefault(phase or "UNKNOWN", []).append(item)
+        return {
+            "assessment_id": assessment_id,
+            "product": name,
+            "counts": {phase: len(group) for phase, group in groups.items()},
+            "by_phase": groups,
+        }
 
     def _patch_poam(
         name: str, assessment_id: str, poam_id: str, section: str, values: dict[str, Any],

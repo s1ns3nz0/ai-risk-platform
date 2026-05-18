@@ -90,6 +90,49 @@ def test_list_for_unknown_product_returns_404(iso_client):
     assert r.status_code == 404
 
 
+# ---------------- by-phase grouping ----------------
+
+
+def test_by_phase_groups_pre_merge_findings_under_build(iso_client):
+    aid = _post_and_get_aid(iso_client)  # default trigger=pre_merge
+    r = iso_client.get(f"/v1/products/payment-api/assessments/{aid}/by-phase")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["assessment_id"] == aid
+    assert set(body["by_phase"].keys()) >= {"BUILD", "TEST", "DEPLOY", "OPERATE"}
+    assert body["counts"]["BUILD"] >= 1
+    assert body["counts"]["DEPLOY"] == 0
+    assert body["counts"]["OPERATE"] == 0
+    # Every grouped item carries the matching source_detail.phase.
+    for item in body["by_phase"]["BUILD"]:
+        assert item["source_detail"]["phase"] == "BUILD"
+
+
+def test_by_phase_pre_deploy_lands_in_deploy(iso_client):
+    payload = {
+        "trigger": "pre_deploy",
+        "results": [{
+            "scanner": "semgrep",
+            "content": {
+                "results": [{
+                    "check_id": "x", "path": "a.py", "start": {"line": 1},
+                    "extra": {"severity": "ERROR", "message": "m"},
+                }],
+                "errors": [],
+            },
+        }],
+    }
+    aid = iso_client.post("/v1/products/payment-api/assess", json=payload).json()["assessment_id"]
+    body = iso_client.get(f"/v1/products/payment-api/assessments/{aid}/by-phase").json()
+    assert body["counts"]["DEPLOY"] >= 1
+    assert body["counts"]["BUILD"] == 0
+
+
+def test_by_phase_unknown_assessment_returns_404(iso_client):
+    r = iso_client.get("/v1/products/payment-api/assessments/RA-NOPE/by-phase")
+    assert r.status_code == 404
+
+
 # ---------------- POA&M update endpoints ----------------
 
 
