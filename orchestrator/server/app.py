@@ -259,6 +259,7 @@ def create_app(
                 "type": "import-assess",
                 "product": name,
                 "trigger": req.trigger,
+                "phase": req.phase,
                 "evidence_url": req.evidence_url,
                 "sbom": req.sbom,
                 "findings": [asdict(f) for f in findings],
@@ -276,6 +277,7 @@ def create_app(
                 clients=state.clients,
                 rego_dir=str(state.rego_dir),
                 trigger=req.trigger,
+                phase=req.phase,
                 evidence_url=req.evidence_url,
                 sbom=req.sbom,
                 store=state.store,
@@ -512,6 +514,7 @@ def _build_handlers(state: ServerState) -> dict[str, Any]:
             clients=state.clients,
             rego_dir=str(state.rego_dir),
             trigger=descriptor.get("trigger", "pre_merge"),
+            phase=descriptor.get("phase"),
             evidence_url=descriptor.get("evidence_url", ""),
             sbom=descriptor.get("sbom"),
             store=state.store,
@@ -643,10 +646,25 @@ def _parse_one_entry(
         from orchestrator.scanners.spotbugs import SpotbugsScanner
         return SpotbugsScanner(mapper).parse_output(entry.content)
 
+    # Honor explicit format=sarif. Also auto-detect SARIF shape so a caller
+    # that sends scanner=semgrep with SARIF content still routes correctly —
+    # without this, _parse_inline("semgrep", ...) would silently return [].
+    is_sarif = (entry.format or "").lower() == "sarif" or _looks_like_sarif(entry.content)
+
     raw = json.dumps(entry.content)
-    if scanner == "sarif":
+    if scanner == "sarif" or is_sarif:
         return parse_sarif(raw, mapper)
     return _parse_inline(scanner, raw, mapper)
+
+
+def _looks_like_sarif(content: Any) -> bool:
+    """Detect SARIF 2.1.0 from content shape."""
+    if not isinstance(content, dict):
+        return False
+    if content.get("version") == "2.1.0" and "runs" in content:
+        return True
+    schema = content.get("$schema", "")
+    return isinstance(schema, str) and "sarif" in schema.lower()
 
 
 def _parse_inline(scanner: str, raw: str, mapper: ControlMapper) -> list[Finding]:

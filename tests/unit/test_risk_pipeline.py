@@ -327,10 +327,11 @@ class TestPipelineProducesSP80030Report:
 
     def test_pipeline_produces_sp800_30_report(self) -> None:
         mock_client = MagicMock()
-        # Filter step uses invoke (selects indices [0,1,2]); assess uses stream_with_cache
+        # No-op filter (top-N cap is high enough that every unique finding
+        # is assessed). _make_findings() yields 6 unique findings.
         mock_client.invoke.return_value = _mock_bedrock_filter_response()
         mock_client.stream_with_cache.side_effect = [
-            _mock_per_finding_response(i) for i in range(3)
+            _mock_per_finding_response(i) for i in range(6)
         ] + [_mock_summary_response()]
 
         pipeline = RiskAssessmentPipeline(bedrock_client=mock_client)
@@ -411,8 +412,10 @@ class TestFilterStepSelectsTopN:
         filtered = pipeline._step2_filter(gathered)
 
         selected = filtered["selected_findings"]
-        assert len(selected) <= 5
-        assert len(selected) >= 1
+        # Top-N truncation was removed: every unique finding is assessed
+        # so the AI filter is bypassed when count <= _TOP_N (200). The 6
+        # fixture findings dedupe to 6.
+        assert len(selected) == 6
 
     def test_filter_step_deterministic_without_ai(self) -> None:
         pipeline = RiskAssessmentPipeline(bedrock_client=None)
@@ -426,8 +429,9 @@ class TestFilterStepSelectsTopN:
         filtered = pipeline._step2_filter(gathered)
 
         selected = filtered["selected_findings"]
-        # Without AI, selects top-N by severity deterministically
-        assert len(selected) <= 5
+        # Without AI, deterministic sort by severity; no truncation since
+        # _TOP_N is high enough to cover all unique findings.
+        assert len(selected) == 6
         # Critical findings should be selected first
         severities = [f["severity"] for f in selected]
         assert severities[0] == "critical"

@@ -6,6 +6,7 @@ deterministic authorization decisions. AI is NOT used.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
@@ -40,6 +41,47 @@ _PHASE: dict[str, str] = {
     "pre_deploy": "DEPLOY",
     "periodic": "OPERATE",
 }
+
+
+# Scanner → NIST 800-53 controls. Used as a fallback when a finding has no
+# control_ids from the mapper (e.g. unmapped rule IDs). Keeps every POA&M item
+# anchored to at least one NIST control so dashboards and CSRs don't show
+# blanks.
+_SCANNER_CONTROL_MAP: dict[str, list[str]] = {
+    "hadolint": ["CM-7", "CM-2"],
+    "checkov":  ["CM-2", "CM-6", "AC-4", "AC-6"],
+    "zap":      ["SA-11", "AC-3", "SI-10"],
+    "grype":    ["RA-5", "SI-2", "SR-3"],
+    "trivy":    ["RA-5", "SI-2", "CM-2", "SI-3"],
+    "semgrep":  ["SA-11", "SI-10", "SC-13"],
+    "gitleaks": ["IA-5", "SI-3"],
+    "spotbugs": ["SA-11", "SI-10"],
+    "bandit":   ["SA-11", "SI-10"],
+    "codeql":   ["SA-11", "SI-10"],
+    "snyk":     ["RA-5", "SI-2", "SR-3"],
+}
+
+
+# Scanner → external framework references (DoD DevSecOps Tables, SSDF, CIS,
+# SP 800-204D, ASVS). Used as a fallback for source_detail.framework_refs.
+_SCANNER_FRAMEWORK_MAP: dict[str, list[str]] = {
+    "hadolint": ["CIS Docker 4.x", "DoD Table 6", "SSDF PW.7.2"],
+    "zap":      ["DoD Table 7", "SSDF PW.8.2", "ASVS V5"],
+    "grype":    ["DoD Table 6/7", "SSDF RV.1", "SP 800-204D §5.1.1"],
+    "trivy":    ["DoD Table 7", "SSDF RV.1", "CIS Docker §4/§5"],
+    "semgrep":  ["DoD Table 5/6", "SSDF PW.7", "SP 800-204D §5.1.3"],
+    "gitleaks": ["DoD Table 5", "SSDF PS.1", "SP 800-204D §5.1.4"],
+    "checkov":  ["DoD Table 6", "SSDF PW.9.1"],
+    "spotbugs": ["DoD Table 5/6", "SSDF PW.7"],
+    "bandit":   ["DoD Table 5/6", "SSDF PW.7"],
+    "codeql":   ["DoD Table 5/6", "SSDF PW.7"],
+    "snyk":     ["DoD Table 6/7", "SSDF RV.1"],
+}
+
+
+# [CWE-XXX] embedded in scanner messages (ZAP, SARIF enrichment) — extract
+# when the scanner didn't surface cwe_ids structurally.
+_CWE_IN_MESSAGE = re.compile(r"\[CWE-(\d+)\]")
 
 
 # Severity -> deadline in days
@@ -210,6 +252,12 @@ class POAMItem:
     # benign refactors and re-runs.
     fingerprint: str = ""
 
+    # Dedup: when one weakness (scanner+rule) recurs across many locations
+    # (e.g. ZAP-90005 across 4 URLs × 4 headers = 16 occurrences), collapse
+    # them into a single POA&M item with the locations listed here.
+    affected_locations: list[str] = field(default_factory=list)
+    occurrence_count: int = 1
+
 
 @dataclass
 class AuthorizationDecision:
@@ -239,6 +287,7 @@ class POAMGenerator:
         trigger: str = "pre_merge",
         evidence_url: str = "",
         sbom: dict[str, object] | None = None,
+        phase: str | None = None,
     ) -> list[POAMItem]:
         """Generate POA&M items from findings.
 
@@ -283,56 +332,92 @@ class POAMGenerator:
         product_name = manifest.name if manifest else ""
         cia = dict(manifest.impact_levels) if manifest else {}
         data_class = list(manifest.data_classification) if manifest else []
-        phase = _PHASE.get(trigger, "BUILD")
+        # Caller-supplied phase wins over the trigger-derived default. CI runs
+        # frequently mix scanner phases (BUILD-time SAST + TEST-time DAST) in
+        # a single submission, so callers should pass the actual phase per run.
+        effective_phase = phase or _PHASE.get(trigger, "UNKNOWN")
 
         # SBOM correlation (best-effort — empty string when SBOM is missing
         # or the package isn't in it).
         from orchestrator.rmf.sbom_correlator import SbomCorrelator
         correlator = SbomCorrelator(sbom)
 
+        # Group findings by (scanner, rule_id, package, installed_version).
+        # Same vulnerability across N URLs/files/headers becomes one POA&M
+        # item with affected_locations listing each occurrence. Package +
+        # version are kept in the key so two different vulnerable packages
+        # that happen to share a CVE id don't get collapsed.
+        groups: dict[tuple[str, str, str, str], list[Finding]] = {}
+        ordered_keys: list[tuple[str, str, str, str]] = []
         for finding in findings:
+            key = (
+                finding.source,
+                finding.rule_id,
+                finding.package or "",
+                finding.installed_version or "",
+            )
+            if key not in groups:
+                groups[key] = []
+                ordered_keys.append(key)
+            groups[key].append(finding)
+
+        for key in ordered_keys:
+            group = groups[key]
+            representative = self._pick_representative(group)
             POAMGenerator._counter += 1
             item_id = f"POAM-{now.strftime('%Y')}-{now.strftime('%m%d')}-{POAMGenerator._counter:03d}"
 
-            deadline_days = _DEADLINE_DAYS.get(finding.severity, 90)
+            severity = representative.severity
+            deadline_days = _DEADLINE_DAYS.get(severity, 90)
             deadline_date = now + timedelta(days=deadline_days)
-            risk_level = _SEVERITY_TO_RISK.get(finding.severity, "moderate")
-            control_id = finding.control_ids[0] if finding.control_ids else ""
-            owner = self._assign_responsible(finding.severity)
+            risk_level = _SEVERITY_TO_RISK.get(severity, "moderate")
+            owner = self._assign_responsible(severity)
             milestones = self._build_milestones(now, deadline_days)
 
-            scan_type = _SCAN_TYPE.get(finding.source, "")
+            scan_type = _SCAN_TYPE.get(representative.source, "")
             is_sca = scan_type == "SCA"
-            cve_id = finding.rule_id if finding.rule_id.startswith("CVE-") else ""
+            cve_id = representative.rule_id if representative.rule_id.startswith("CVE-") else ""
             epss = epss_lookup.get(cve_id) if cve_id else None
 
-            cwe_ids = list(finding.cwe_ids)
+            cwe_ids = list(representative.cwe_ids)
+            # IMPROVE-5c: pull CWE out of "...[CWE-XXX]" message text when the
+            # scanner didn't expose it structurally (ZAP embeds CWE in message).
+            if not cwe_ids:
+                cwe_ids = _extract_cwes_from_text(representative.message)
+
+            scanner_controls = _SCANNER_CONTROL_MAP.get(representative.source, [])
+            effective_control_ids = list(representative.control_ids) or list(scanner_controls)
+            control_id = effective_control_ids[0] if effective_control_ids else ""
+
             weakness = POAMWeakness(
-                title=(finding.message or finding.rule_id)[:200],
+                title=(representative.message or representative.rule_id)[:200],
                 cve_id=cve_id,
-                cwe_id=cwe_ids[0] if cwe_ids else "",
-                cwe_ids=cwe_ids,
-                severity=finding.severity,
-                cvss_score=finding.cvss_score,
+                cwe_id=(f"CWE-{cwe_ids[0]}" if cwe_ids and not cwe_ids[0].startswith("CWE-") else (cwe_ids[0] if cwe_ids else "")),
+                cwe_ids=[c if c.startswith("CWE-") else f"CWE-{c}" for c in cwe_ids],
+                severity=severity,
+                cvss_score=representative.cvss_score,
                 epss_score=epss,
-                package=finding.package,
-                supply_chain=is_sca and bool(finding.package),
-                description=self._describe_weakness(finding),
+                package=representative.package,
+                supply_chain=is_sca and bool(representative.package),
+                description=self._describe_weakness(representative),
+            )
+            framework_refs = list(representative.control_ids) or list(
+                _SCANNER_FRAMEWORK_MAP.get(representative.source, [])
             )
             source_detail = POAMSource(
-                scanner=finding.source,
+                scanner=representative.source,
                 scan_type=scan_type,
-                phase=phase,
-                framework_refs=list(finding.control_ids),
-                finding_id=finding.rule_id,
+                phase=effective_phase,
+                framework_refs=framework_refs,
+                finding_id=representative.rule_id,
                 evidence_url=evidence_url,
-                sbom_ref=correlator.correlate(finding.package, finding.installed_version),
+                sbom_ref=correlator.correlate(representative.package, representative.installed_version),
             )
             impact = POAMImpact(
                 affected_asset=product_name,
                 cia=cia,
                 data_classification=data_class,
-                business_impact=self._describe_business_impact(finding, manifest),
+                business_impact=self._describe_business_impact(representative, manifest),
             )
             lifecycle = POAMLifecycle(
                 discovered_at=now.isoformat(),
@@ -341,26 +426,28 @@ class POAMGenerator:
                 closed_at=None,
             )
             remediation = POAMRemediation(
-                plan=self._describe_remediation(finding),
+                plan=self._describe_remediation(representative),
                 owner=owner,
-                resources_required=self._estimate_resources(finding),
-                vendor_dependency=self._vendor_dependency(finding),
+                resources_required=self._estimate_resources(representative),
+                vendor_dependency=self._vendor_dependency(representative),
             )
+
+            locations = _collect_locations(group)
 
             items.append(
                 POAMItem(
                     id=item_id,
-                    weakness=finding.message,
+                    weakness=representative.message,
                     control_id=control_id,
-                    source=finding.source,
-                    finding_id=finding.rule_id,
-                    severity=finding.severity,
+                    source=representative.source,
+                    finding_id=representative.rule_id,
+                    severity=severity,
                     risk_level=risk_level,
                     status="open",
                     milestones=milestones,
                     scheduled_completion=deadline_date.strftime("%Y-%m-%d"),
                     responsible=owner,
-                    cost_estimate=_SEVERITY_TO_COST.get(finding.severity, "moderate"),
+                    cost_estimate=_SEVERITY_TO_COST.get(severity, "moderate"),
                     finding_evidence="findings.jsonl",
                     override_id="",
                     ticket=POAMTicket(),  # filled by pipeline post-creation
@@ -372,11 +459,19 @@ class POAMGenerator:
                     delay=POAMDelay(),
                     risk_acceptance=POAMRiskAcceptance(),
                     verification=POAMVerification(verified_by="automated"),
-                    fingerprint=fingerprint_for_finding(finding),
+                    fingerprint=fingerprint_for_finding(representative),
+                    affected_locations=locations,
+                    occurrence_count=len(group),
                 )
             )
 
         return items
+
+    @staticmethod
+    def _pick_representative(group: list[Finding]) -> Finding:
+        """Pick the most severe finding in the group as the canonical one."""
+        order = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
+        return max(group, key=lambda f: order.get(f.severity, -1))
 
     # --- static-template fallbacks for AI-generated fields ---
     # These keep the schema fully populated when Bedrock isn't configured.
@@ -554,3 +649,41 @@ def fingerprint_for_finding(f: Finding) -> str:
     """
     parts = [f.source, f.rule_id, f.package or "", f.installed_version or "", f.file or ""]
     return "|".join(p.strip() for p in parts)
+
+
+def _extract_cwes_from_text(text: str) -> list[str]:
+    """Find every [CWE-NNN] reference in a string.
+
+    Some scanners (notably ZAP) only embed the CWE in the human-readable
+    message rather than as a structured field. Pulling it out keeps
+    weakness_detail.cwe_id populated.
+    """
+    if not text:
+        return []
+    return [m for m in _CWE_IN_MESSAGE.findall(text)]
+
+
+def _collect_locations(group: list[Finding]) -> list[str]:
+    """Format affected locations from a dedup group.
+
+    For SAST/IaC: "path/to/file.py:42". For DAST (ZAP): "http://host/path"
+    plus the affected parameter pulled from the message.
+    """
+    seen: list[str] = []
+    deduped: set[str] = set()
+    param_re = re.compile(r"\(param:\s*([^)]+)\)")
+    for f in group:
+        if f.file:
+            loc = f.file if not f.line else f"{f.file}:{f.line}"
+            if f.source == "zap":
+                m = param_re.search(f.message or "")
+                if m:
+                    loc = f"{f.file} ({m.group(1).strip()})"
+        elif f.message:
+            loc = f.message[:120]
+        else:
+            loc = "(unknown)"
+        if loc not in deduped:
+            deduped.add(loc)
+            seen.append(loc)
+    return seen

@@ -7,6 +7,7 @@ Same SP80030Report output format — just less nuanced.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -44,13 +45,136 @@ _SEVERITY_TO_LIKELIHOOD: dict[str, str] = {
     "low": "low",
 }
 
-# Threat source type mapping based on finding source
-_SOURCE_TYPE_MAP: dict[str, str] = {
-    "semgrep": "adversarial",
-    "gitleaks": "adversarial",
-    "grype": "structural",
-    "checkov": "structural",
+# Per-scanner threat source profile. Keeps SP 800-30 Section 3.1 narratives
+# proportionate — calling a hadolint Dockerfile lint an "external attacker"
+# (the old default) was misleading. Type/name align with SP 800-30 categories;
+# capability defaults are derived from typical scanner output severity.
+_THREAT_SOURCE_PROFILE: dict[str, dict[str, str]] = {
+    "hadolint":    {"type": "non-adversarial", "name": "Configuration drift / supply chain risk",   "capability": "n/a"},
+    "checkov":     {"type": "non-adversarial", "name": "Infrastructure misconfiguration",           "capability": "n/a"},
+    "grype":       {"type": "adversarial",     "name": "External attacker exploiting known CVE",    "capability": "varies"},
+    "grype-image": {"type": "adversarial",     "name": "External attacker exploiting container CVE","capability": "varies"},
+    "trivy":       {"type": "non-adversarial", "name": "Container compliance drift",                "capability": "n/a"},
+    "semgrep":     {"type": "adversarial",     "name": "Application-level attacker",                "capability": "moderate"},
+    "gitleaks":    {"type": "adversarial",     "name": "Insider threat / credential exposure",      "capability": "high"},
+    "zap":         {"type": "adversarial",     "name": "External web application attacker",         "capability": "moderate"},
+    "spotbugs":    {"type": "adversarial",     "name": "Application-level attacker",                "capability": "moderate"},
+    "bandit":      {"type": "adversarial",     "name": "Application-level attacker",                "capability": "moderate"},
+    "codeql":      {"type": "adversarial",     "name": "Application-level attacker",                "capability": "moderate"},
+    "snyk":        {"type": "adversarial",     "name": "External attacker exploiting known CVE",    "capability": "varies"},
 }
+
+# Legacy two-letter type map kept for backwards compatibility with callers
+# (e.g. pipeline.py imports _SOURCE_TYPE_MAP). Now derived from the profile.
+_SOURCE_TYPE_MAP: dict[str, str] = {
+    src: prof["type"] for src, prof in _THREAT_SOURCE_PROFILE.items()
+}
+
+
+# CWE → MITRE ATT&CK technique. Used to choose threat_event.mitre_technique
+# when the finding carries a CWE. Mapping is intentionally conservative —
+# only entries with a defensible relationship are listed; unknown CWEs fall
+# through to scanner-rule and message heuristics.
+_CWE_MITRE_MAP: dict[str, str] = {
+    "CWE-20":  "T1190",         # Improper Input Validation → Exploit Public-Facing App
+    "CWE-22":  "T1083",         # Path Traversal → File and Directory Discovery
+    "CWE-77":  "T1059",         # Command Injection
+    "CWE-78":  "T1059.004",     # OS Command Injection → Unix Shell
+    "CWE-79":  "T1059.007",     # XSS → JavaScript
+    "CWE-89":  "T1190",         # SQL Injection → Exploit Public-Facing App
+    "CWE-94":  "T1059",         # Code Injection
+    "CWE-200": "T1592",         # Information Exposure → Gather Victim Host Info
+    "CWE-209": "T1592",         # Error message info disclosure
+    "CWE-215": "T1082",         # Sensitive Info in Debug → System Information Discovery
+    "CWE-269": "T1068",         # Improper Privilege Management → Privilege Escalation
+    "CWE-287": "T1078",         # Improper Authentication → Valid Accounts
+    "CWE-306": "T1078",         # Missing Authentication
+    "CWE-311": "T1552",         # Missing Encryption → Unsecured Credentials
+    "CWE-319": "T1040",         # Cleartext Transmission → Network Sniffing
+    "CWE-326": "T1600",         # Weak Encryption → Weaken Encryption
+    "CWE-352": "T1185",         # CSRF → Browser Session Hijacking
+    "CWE-434": "T1505.003",     # Unrestricted File Upload → Web Shell
+    "CWE-502": "T1059",         # Insecure Deserialization
+    "CWE-522": "T1552",         # Insufficiently Protected Credentials
+    "CWE-524": "T1040",         # Cacheable Sensitive Data → Network Sniffing
+    "CWE-611": "T1190",         # XXE → Exploit Public-Facing App
+    "CWE-732": "T1222",         # Incorrect Permission → File Permissions Modification
+    "CWE-798": "T1552.001",     # Hardcoded Credentials → Credentials in Files
+    "CWE-918": "T1190",         # SSRF
+}
+
+# Scanner rule (e.g. hadolint DL3008) → MITRE technique. Falls back to the
+# CWE mapping when the scanner emits a CWE; this is the second-priority
+# lookup for rules with stable, well-understood semantics.
+_RULE_MITRE_MAP: dict[str, str] = {
+    "DL3008": "T1195.002",  # Supply Chain Compromise (apt without version pin)
+    "DL3015": "T1195.002",
+    "DL3018": "T1195.002",  # apk add without --no-cache
+    "DL3013": "T1195.002",  # pip install without version pin
+    "DL4006": "T1059",      # Command/Scripting Interpreter (pipe without -o)
+    "DL3025": "T1059",
+}
+
+_CWE_TOKEN = re.compile(r"CWE-(\d+)")
+
+
+def _resolve_mitre(finding: Finding) -> str:
+    """Pick the most specific MITRE technique for a finding.
+
+    Priority: structural cwe_ids → CWE pulled from message → scanner rule →
+    'injection' heuristic → T1078 default.
+    """
+    cwe_ids = [c if c.startswith("CWE-") else f"CWE-{c}" for c in (finding.cwe_ids or [])]
+    if not cwe_ids:
+        cwe_ids = [f"CWE-{m}" for m in _CWE_TOKEN.findall(finding.message or "")]
+    for cwe in cwe_ids:
+        tech = _CWE_MITRE_MAP.get(cwe)
+        if tech:
+            return tech
+    if finding.rule_id in _RULE_MITRE_MAP:
+        return _RULE_MITRE_MAP[finding.rule_id]
+    if "injection" in (finding.message or "").lower():
+        return "T1190"
+    return "T1078"
+
+
+def _resolve_mitre_from_dict(finding: dict[str, Any]) -> str:
+    """Same priority as _resolve_mitre() but for plain dict findings used in
+    build_assessment().
+    """
+    cwe_ids = [c if c.startswith("CWE-") else f"CWE-{c}" for c in (finding.get("cwe_ids") or [])]
+    if not cwe_ids:
+        cwe_ids = [f"CWE-{m}" for m in _CWE_TOKEN.findall(finding.get("message", "") or "")]
+    for cwe in cwe_ids:
+        tech = _CWE_MITRE_MAP.get(cwe)
+        if tech:
+            return tech
+    rule_id = finding.get("rule_id", "")
+    if rule_id in _RULE_MITRE_MAP:
+        return _RULE_MITRE_MAP[rule_id]
+    if "injection" in (finding.get("message", "") or "").lower():
+        return "T1190"
+    return "T1078"
+
+
+def _threat_source_for(source: str, severity: str) -> dict[str, str]:
+    """Resolve scanner-specific threat source profile, with capability filled in.
+
+    Non-listed scanners default to adversarial/external attacker — preserves
+    the previous behaviour for unknown sources.
+    """
+    profile = _THREAT_SOURCE_PROFILE.get(source)
+    if profile is None:
+        profile = {
+            "type": "adversarial",
+            "name": f"External attacker — {source}",
+            "capability": _SEVERITY_TO_LIKELIHOOD.get(severity, "moderate"),
+        }
+    else:
+        profile = dict(profile)
+        if profile["capability"] in ("varies", "n/a"):
+            profile["capability"] = _SEVERITY_TO_LIKELIHOOD.get(severity, "moderate")
+    return profile
 
 
 class StaticRiskAssessmentPipeline:
@@ -70,13 +194,20 @@ class StaticRiskAssessmentPipeline:
         progress_callback: object = None,
     ) -> SP80030Report:
         """Template-based SP 800-30 assessment."""
-        # Sort findings by severity
+        # Dedup by (scanner, rule_id) so the SP 800-30 narrative reflects
+        # unique weaknesses, not raw finding count. 16 instances of the same
+        # ZAP rule across URLs is one threat event, not sixteen.
+        unique_findings = _dedupe_findings(findings)
+
+        # Analyze every unique finding — the previous top-5 cap dropped
+        # important threat events on noisy scans (e.g. 25 raw findings with
+        # 6 unique rules were truncated to 5).
         sorted_findings = sorted(
-            findings,
+            unique_findings,
             key=lambda f: _SEVERITY_ORDER.get(f.severity, 0),
             reverse=True,
         )
-        top_findings = sorted_findings[:5]
+        top_findings = sorted_findings
 
         # Build EPSS map
         epss_map: dict[str, float | None] = {
@@ -95,7 +226,8 @@ class StaticRiskAssessmentPipeline:
         source_counter: dict[str, int] = {}
 
         for i, finding in enumerate(top_findings):
-            src_type = _SOURCE_TYPE_MAP.get(finding.source, "adversarial")
+            profile = _threat_source_for(finding.source, finding.severity)
+            src_type = profile["type"]
             source_counter.setdefault(src_type, 0)
             source_counter[src_type] += 1
             ts_idx = source_counter[src_type]
@@ -108,8 +240,8 @@ class StaticRiskAssessmentPipeline:
             ts = ThreatSource(
                 id=ts_id,
                 type=src_type,
-                name=f"{'External attacker' if src_type == 'adversarial' else 'System weakness'} — {finding.source}",
-                capability=_SEVERITY_TO_LIKELIHOOD.get(finding.severity, "moderate"),
+                name=profile["name"],
+                capability=profile["capability"],
                 intent="Financial gain via data theft" if src_type == "adversarial" else "",
                 targeting="Targeted" if is_pci and src_type == "adversarial" else "",
             )
@@ -121,7 +253,7 @@ class StaticRiskAssessmentPipeline:
                 id=te_id,
                 description=finding.message,
                 source_id=ts_id,
-                mitre_technique="T1190" if "injection" in finding.message.lower() else "T1078",
+                mitre_technique=_resolve_mitre(finding),
                 relevance="confirmed",
                 cve_id=cve_id,
                 target_component=f"{finding.file}:{finding.line}",
@@ -198,7 +330,8 @@ class StaticRiskAssessmentPipeline:
         ))
 
         executive_summary = (
-            f"{manifest.name} has {len(findings)} findings ({sev_summary}). "
+            f"{manifest.name} has {len(findings)} findings "
+            f"({len(unique_findings)} unique; {sev_summary}). "
             f"{'PCI-scoped product requires immediate attention for critical/high findings. ' if is_pci else ''}"
             f"Risk assessment covers {len(controls)} applicable controls across "
             f"{len(set(c.framework for c in controls))} frameworks."
@@ -274,7 +407,8 @@ class StaticRiskAssessmentPipeline:
         for i, f in enumerate(selected):
             severity = f.get("severity", "medium")
             source = f.get("source", "unknown")
-            src_type = _SOURCE_TYPE_MAP.get(source, "adversarial")
+            profile = _threat_source_for(source, severity)
+            src_type = profile["type"]
             source_counter.setdefault(src_type, 0)
             source_counter[src_type] += 1
 
@@ -285,8 +419,8 @@ class StaticRiskAssessmentPipeline:
             threat_sources.append({
                 "id": ts_id,
                 "type": src_type,
-                "name": f"{'External attacker' if src_type == 'adversarial' else 'System weakness'} — {source}",
-                "capability": _SEVERITY_TO_LIKELIHOOD.get(severity, "moderate"),
+                "name": profile["name"],
+                "capability": profile["capability"],
                 "intent": "Financial gain" if src_type == "adversarial" else "",
                 "targeting": "Targeted" if is_pci and src_type == "adversarial" else "",
             })
@@ -297,7 +431,7 @@ class StaticRiskAssessmentPipeline:
                 "id": te_id,
                 "description": msg,
                 "source_id": ts_id,
-                "mitre_technique": "T1190" if "injection" in msg.lower() else "T1078",
+                "mitre_technique": _resolve_mitre_from_dict(f),
                 "relevance": "confirmed",
                 "cve_id": cve_id,
                 "target_component": f"{f.get('file', '')}:{f.get('line', 0)}",
@@ -356,8 +490,8 @@ class StaticRiskAssessmentPipeline:
 
         n_findings = filtered.get("n_findings", len(selected))
         executive_summary = (
-            f"{manifest.name} has {n_findings} total findings. "
-            f"Top {len(selected)} analyzed via static assessment. "
+            f"{manifest.name} has {n_findings} total findings; "
+            f"{len(selected)} unique weakness(es) analyzed. "
             f"{'PCI-scoped product — critical/high findings require immediate attention.' if is_pci else ''}"
         )
 
@@ -420,6 +554,27 @@ class StaticRiskAssessmentPipeline:
         if score >= 10:
             return "low"
         return "very-low"
+
+
+def _dedupe_findings(findings: list[Finding]) -> list[Finding]:
+    """Group findings by (scanner, rule_id, package, installed_version).
+
+    Returns the most severe representative for each group, preserving
+    insertion order. This mirrors POAMGenerator's dedup so the SP 800-30
+    report's threat_events line up with the POA&M items.
+    """
+    order = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0, "very-low": -1}
+    groups: dict[tuple[str, str, str, str], Finding] = {}
+    keys: list[tuple[str, str, str, str]] = []
+    for f in findings:
+        key = (f.source, f.rule_id, f.package or "", f.installed_version or "")
+        existing = groups.get(key)
+        if existing is None:
+            groups[key] = f
+            keys.append(key)
+        elif order.get(f.severity, -1) > order.get(existing.severity, -1):
+            groups[key] = f
+    return [groups[k] for k in keys]
 
 
 def _compute_static_impact(

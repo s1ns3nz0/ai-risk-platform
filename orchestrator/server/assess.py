@@ -88,6 +88,7 @@ def run_assessment(
     evidence_url: str = "",
     sbom: dict[str, Any] | None = None,
     store: Any = None,
+    phase: str | None = None,
 ) -> AssessmentResult:
     """Run gate + SP 800-30 + SAR + POA&M + authorization on a finding list."""
     t0 = time.monotonic()
@@ -140,6 +141,7 @@ def run_assessment(
         trigger=trigger,
         evidence_url=evidence_url,
         sbom=sbom,
+        phase=phase,
     )
 
     # Bedrock-only: replace static templates with model-generated text on

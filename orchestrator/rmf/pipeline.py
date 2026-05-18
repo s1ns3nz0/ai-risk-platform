@@ -61,7 +61,11 @@ def _extract_json(raw: str) -> dict[str, object]:
 
 _SEVERITY_ORDER = {"critical": 4, "high": 3, "medium": 2, "low": 1, "very-low": 0}
 
-_TOP_N = 5
+# Hard ceiling that protects the AI assess step from runaway invoke costs.
+# Set high enough that real-world unique-finding counts (typically <50 even on
+# noisy scans) are analyzed in full. Previously this was 5, which silently
+# dropped most of the report.
+_TOP_N = 200
 
 FILTER_PROMPT = """\
 You are a security analyst triaging findings for a risk assessment.
@@ -268,6 +272,9 @@ class RiskAssessmentPipeline:
         trigger: str,
     ) -> dict[str, Any]:
         """Step 1: GATHER — collect all context (no AI)."""
+        # Dedupe before AI assess so we don't burn invokes on duplicates.
+        from orchestrator.rmf.static_pipeline import _dedupe_findings
+        unique = _dedupe_findings(findings)
         findings_data = [
             {
                 "index": i,
@@ -278,11 +285,12 @@ class RiskAssessmentPipeline:
                 "line": f.line,
                 "message": f.message,
                 "control_ids": f.control_ids,
+                "cwe_ids": list(f.cwe_ids),
                 "package": f.package,
                 "installed_version": f.installed_version,
                 "fixed_version": f.fixed_version,
             }
-            for i, f in enumerate(findings)
+            for i, f in enumerate(unique)
         ]
 
         epss_map: dict[str, dict[str, float | str | None]] = {}
@@ -556,13 +564,15 @@ class RiskAssessmentPipeline:
             StaticRiskAssessmentPipeline,
             _LEVEL_SCORE,
             _SEVERITY_TO_LIKELIHOOD,
-            _SOURCE_TYPE_MAP,
             _compute_static_impact,
+            _resolve_mitre_from_dict,
+            _threat_source_for,
         )
 
         severity = finding.get("severity", "medium")
         source = finding.get("source", "unknown")
-        src_type = _SOURCE_TYPE_MAP.get(source, "adversarial")
+        profile = _threat_source_for(source, severity)
+        src_type = profile["type"]
         is_pci = "PCI" in manifest.data_classification
         control_ids = finding.get("control_ids", [])
 
@@ -585,8 +595,8 @@ class RiskAssessmentPipeline:
             "threat_source": {
                 "id": ts_id,
                 "type": src_type,
-                "name": f"{'External attacker' if src_type == 'adversarial' else 'System weakness'} — {source}",
-                "capability": sev_level,
+                "name": profile["name"],
+                "capability": profile["capability"],
                 "intent": "Financial gain" if src_type == "adversarial" else "",
                 "targeting": "Targeted" if is_pci and src_type == "adversarial" else "",
             },
@@ -594,7 +604,7 @@ class RiskAssessmentPipeline:
                 "id": te_id,
                 "description": msg,
                 "source_id": ts_id,
-                "mitre_technique": "T1190" if "injection" in msg.lower() else "T1078",
+                "mitre_technique": _resolve_mitre_from_dict(finding),
                 "relevance": "confirmed",
                 "cve_id": finding.get("rule_id", "") if finding.get("rule_id", "").startswith("CVE-") else "",
                 "target_component": f"{finding.get('file', '')}:{finding.get('line', 0)}",

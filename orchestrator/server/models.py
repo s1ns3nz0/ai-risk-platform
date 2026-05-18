@@ -25,6 +25,15 @@ class ScannerResultPayload(BaseModel):
             "XML (string). When omitted, the parser auto-detects from content."
         ),
     )
+    format: str | None = Field(
+        default=None,
+        description=(
+            "Output format hint. When set to 'sarif', the content is parsed as "
+            "SARIF 2.1.0 regardless of the scanner name. Useful for scanners "
+            "that emit native JSON by default but can also emit SARIF "
+            "(semgrep, gitleaks, grype, trivy, etc.)."
+        ),
+    )
     content: Any = Field(
         default=None,
         description=(
@@ -65,6 +74,9 @@ class ScannerResultPayload(BaseModel):
         return v
 
 
+DevSecOpsPhase = Literal["BUILD", "TEST", "RELEASE", "DELIVER", "DEPLOY", "OPERATE", "UNKNOWN"]
+
+
 class ImportAssessRequest(BaseModel):
     """Submit pre-existing scanner results for assessment."""
 
@@ -78,6 +90,16 @@ class ImportAssessRequest(BaseModel):
         default=False,
         description="Return 202 with a job ID instead of blocking. "
         "Recommended when BEDROCK_MODEL_ID is configured.",
+    )
+    phase: DevSecOpsPhase | None = Field(
+        default=None,
+        description=(
+            "DevSecOps phase that produced these results: BUILD, TEST, RELEASE, "
+            "DELIVER, DEPLOY, OPERATE. When set, overrides the trigger-derived "
+            "default on every POA&M item's source_detail.phase. Falls back to "
+            "the trigger mapping (pre_merge→BUILD, pre_deploy→DEPLOY, "
+            "periodic→OPERATE) when omitted."
+        ),
     )
     evidence_url: str = Field(
         default="",
