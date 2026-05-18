@@ -30,7 +30,7 @@ spec:
       containers:
         - name: server
           # Replace with your registry path. Build with: docker build -t <ref> .
-          image: ghcr.io/s1ns3nz0/ai-risk-platform:0.1.0
+          image: 106760547719.dkr.ecr.ap-northeast-2.amazonaws.com/ai-risk-platform:0.1.0
           imagePullPolicy: IfNotPresent
           args:
             - "--host"
