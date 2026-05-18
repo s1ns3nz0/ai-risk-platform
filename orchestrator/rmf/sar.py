@@ -76,13 +76,23 @@ class SARGenerator:
         findings: list[Finding],
         gate_decision: GateDecision,
         risk_report: SP80030Report | None = None,
+        submitted_scanners: set[str] | None = None,
     ) -> SecurityAssessmentReport:
-        """Generate SAR."""
+        """Generate SAR.
+
+        `submitted_scanners` lets callers declare which scanners *ran* even
+        when they produced zero findings (a clean scan must still credit the
+        control as 'satisfied'). When None, falls back to inferring from
+        finding sources — appropriate for in-process scan-mode where only
+        scanners that produced findings are observed.
+        """
         now = datetime.now(timezone.utc)
         report_id = f"SAR-{now.strftime('%Y')}-{now.strftime('%m%d')}-001"
 
-        # Collect all scanners that produced findings
-        scanners_that_ran: set[str] = {f.source for f in findings}
+        # Union: scanners we know were submitted + any that produced findings.
+        scanners_that_ran: set[str] = set(submitted_scanners or set()) | {
+            f.source for f in findings
+        }
 
         # Build per-control index of findings
         control_findings: dict[str, list[Finding]] = {}

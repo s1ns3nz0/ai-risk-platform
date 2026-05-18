@@ -186,6 +186,71 @@ def test_not_assessed_when_no_scanner_ran() -> None:
     assert assessment.evidence_type == "none"
 
 
+def test_satisfied_when_scanner_submitted_zero_findings() -> None:
+    """Scanner submitted with zero findings -> satisfied (clean scan).
+
+    Regression: previously a gitleaks payload with results=[] left every
+    gitleaks-assessed control flagged 'not-assessed' because
+    scanners_that_ran was inferred from finding.source. A clean scan must
+    credit the control.
+    """
+    ctrl = _make_control(control_id="ASVS-V2.10.4", scanner="gitleaks")
+    repo = _mini_repo_with_controls([ctrl])
+    gen = SARGenerator(repo)
+
+    sar = gen.generate(
+        product="payment-api",
+        findings=[],
+        gate_decision=_make_gate_decision(passed=True),
+        submitted_scanners={"gitleaks"},
+    )
+
+    assessment = sar.control_assessments[0]
+    assert assessment.status == "satisfied"
+    assert assessment.evidence_type == "automated"
+    assert assessment.assessor == "gitleaks"
+    assert assessment.findings_summary == "No issues found"
+
+
+def test_submitted_scanners_union_with_finding_sources() -> None:
+    """Both submitted_scanners *and* finding sources count as 'ran'.
+
+    Important for scan-mode (in-process) which only knows scanners by
+    inspecting findings, and for import-mode where the HTTP layer adds
+    zero-finding scanners on top.
+    """
+    controls = [
+        _make_control(control_id="C-grype", scanner="grype"),
+        _make_control(control_id="C-checkov", scanner="checkov"),
+    ]
+    repo = _mini_repo_with_controls(controls)
+    gen = SARGenerator(repo)
+
+    findings = [
+        Finding(
+            source="grype",
+            rule_id="CVE-2024-1234",
+            severity="high",
+            file="requirements.txt",
+            line=0,
+            message="vuln",
+            control_ids=["C-grype"],
+            product="payment-api",
+        ),
+    ]
+
+    sar = gen.generate(
+        product="payment-api",
+        findings=findings,
+        gate_decision=_make_gate_decision(passed=False),
+        submitted_scanners={"checkov"},  # zero-finding checkov
+    )
+
+    by_id = {a.control_id: a for a in sar.control_assessments}
+    assert by_id["C-grype"].status == "other-than-satisfied"  # from findings
+    assert by_id["C-checkov"].status == "satisfied"            # from submitted set
+
+
 def test_not_assessed_when_no_verification_methods() -> None:
     """Control with no verification_methods -> not-assessed (manual only)."""
     ctrl = Control(

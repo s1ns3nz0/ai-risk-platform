@@ -246,7 +246,7 @@ def create_app(
     def assess_endpoint(name: str, req: ImportAssessRequest) -> Any:
         cfg = _get_product_or_404(state, name)
         _require_async_for_bedrock(state, req.async_mode)
-        findings = _parse_payloads(req.results, state)
+        findings, submitted_scanners = _parse_payloads(req.results, state)
         # Zero findings is a valid outcome (clean scan) — proceed and let the
         # assessor produce a low-risk report. The /assess endpoint only 400s
         # for truly malformed input (pydantic 422) or product-not-found (404).
@@ -263,6 +263,7 @@ def create_app(
                 "evidence_url": req.evidence_url,
                 "sbom": req.sbom,
                 "findings": [asdict(f) for f in findings],
+                "submitted_scanners": sorted(submitted_scanners),
             }
             return _accept_distributed(jobs, descriptor)
 
@@ -281,6 +282,7 @@ def create_app(
                 evidence_url=req.evidence_url,
                 sbom=req.sbom,
                 store=state.store,
+                submitted_scanners=submitted_scanners,
             )
         return _run_sync_or_async(_do, async_mode=req.async_mode, jobs=jobs)
 
@@ -505,6 +507,7 @@ def _build_handlers(state: ServerState) -> dict[str, Any]:
     def import_assess(descriptor: dict[str, Any]) -> AssessmentResult:
         cfg = state.get_product(descriptor["product"])
         findings = [Finding(**fd) for fd in descriptor.get("findings", [])]
+        submitted = descriptor.get("submitted_scanners") or []
         return run_assessment(
             product=descriptor["product"],
             findings=findings,
@@ -518,6 +521,7 @@ def _build_handlers(state: ServerState) -> dict[str, Any]:
             evidence_url=descriptor.get("evidence_url", ""),
             sbom=descriptor.get("sbom"),
             store=state.store,
+            submitted_scanners=set(submitted) if submitted else None,
         )
 
     def scan_assess(descriptor: dict[str, Any]) -> AssessmentResult:
@@ -568,36 +572,63 @@ def _require_async_for_bedrock(state: ServerState, async_mode: bool) -> None:
 # parser — accepts SARIF (dict) and raw/base64-encoded XML (string).
 _SCANNER_ALIASES: dict[str, str] = {
     "grype-image": "grype",
+    "grype-sbom": "grype",
     "trivy-fs": "trivy",
     "trivy-image": "trivy",
     "trivy-config": "trivy",
+    "trivy-cis": "trivy",
     "trivy-sarif": "sarif",
     "hadolint": "sarif",
     "snyk": "sarif",
     "bandit": "sarif",
     "codeql": "sarif",
     "semgrep-sarif": "sarif",
+    # Checkov framework variants — pipelines typically run checkov per
+    # framework (Terraform, Kubernetes, Dockerfile, CloudFormation) and
+    # emit one file each. All share the same {check_type, results,
+    # summary} shape, so route them through the checkov parser.
+    "checkov-k8s": "checkov",
+    "checkov-kubernetes": "checkov",
+    "checkov-dockerfile": "checkov",
+    "checkov-terraform": "checkov",
+    "checkov-cloudformation": "checkov",
+    "checkov-helm": "checkov",
+    "checkov-secrets": "checkov",
+    # SpotBugs variants — the SARIF plugin output is routed by spotbugs
+    # parser polymorphically; the raw XML upload form gets its own alias
+    # so callers can be explicit.
+    "spotbugs-xml": "spotbugs",
 }
 
 
 def _parse_payloads(
     payloads: list[ScannerResultPayload],
     state: ServerState,
-) -> list[Finding]:
-    """Parse every entry into findings, treating each entry independently.
+) -> tuple[list[Finding], set[str]]:
+    """Parse every entry into findings + return the set of scanners submitted.
 
     A single bad/empty entry must not fail the batch — log it and continue.
     This matches what CI pipelines actually look like: 8 scanners run in
     parallel, some produce empty results, some fail. The batch should still
     yield findings from the successful ones.
+
+    The submitted-scanners set is what lets the SAR distinguish "scanner ran
+    and found nothing" (satisfied) from "scanner never ran" (not-assessed) —
+    a zero-finding gitleaks payload must still credit gitleaks-assessed
+    controls. We record the canonical scanner name for any payload whose
+    type could be determined, regardless of whether parsing yielded findings.
     """
     from orchestrator.parsers.registry import detect_scanner_from_content
     from orchestrator.parsers.sarif import parse_sarif
 
     mapper = ControlMapper(state.controls_repo)
     all_findings: list[Finding] = []
+    submitted_scanners: set[str] = set()
 
     for idx, entry in enumerate(payloads):
+        canonical = _resolve_scanner_name(entry, detect_scanner_from_content)
+        if canonical:
+            submitted_scanners.add(canonical)
         try:
             findings = _parse_one_entry(entry, idx, mapper, detect_scanner_from_content, parse_sarif)
         except Exception as exc:  # parser bug shouldn't kill the batch
@@ -608,7 +639,32 @@ def _parse_payloads(
             continue
         all_findings.extend(findings)
 
-    return all_findings
+    return all_findings, submitted_scanners
+
+
+def _resolve_scanner_name(entry: ScannerResultPayload, detect: Any) -> str | None:
+    """Resolve the canonical scanner name for SAR submission tracking.
+
+    Mirrors the routing logic in _parse_one_entry but only returns the
+    name — without invoking any parser. Returns None when neither the
+    explicit `scanner` field nor content auto-detection yields a type.
+    SARIF payloads are reported under their advertised scanner name when
+    available (e.g. hadolint, snyk) since that's what the SAR maps to.
+    """
+    if entry.scanner:
+        canonical = _SCANNER_ALIASES.get(entry.scanner, entry.scanner)
+        # SARIF aliases (hadolint, snyk, ...) collapse to "sarif" for parsing
+        # but the SAR needs the original tool name to match verification
+        # methods. Preserve the alias key, not the canonical "sarif" sink.
+        if canonical == "sarif" and entry.scanner != "sarif":
+            return entry.scanner
+        return canonical
+    if entry.content in (None, "", [], {}):
+        return None
+    if isinstance(entry.content, str):
+        return None  # XML body without a declared scanner — cannot identify
+    detected = detect(entry.content)
+    return detected
 
 
 def _parse_one_entry(

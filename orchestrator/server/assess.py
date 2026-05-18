@@ -89,6 +89,7 @@ def run_assessment(
     sbom: dict[str, Any] | None = None,
     store: Any = None,
     phase: str | None = None,
+    submitted_scanners: set[str] | None = None,
 ) -> AssessmentResult:
     """Run gate + SP 800-30 + SAR + POA&M + authorization on a finding list."""
     t0 = time.monotonic()
@@ -130,7 +131,11 @@ def run_assessment(
     gate = combined.evaluate(tagged, tier, context)
 
     sar = SARGenerator(controls_repo).generate(
-        product=product, findings=tagged, gate_decision=gate, risk_report=sp800_report,
+        product=product,
+        findings=tagged,
+        gate_decision=gate,
+        risk_report=sp800_report,
+        submitted_scanners=submitted_scanners,
     )
     poam_items = POAMGenerator().generate(
         findings=tagged,

@@ -59,15 +59,23 @@ class ScannerResultPayload(BaseModel):
         if v is None:
             return v
         # Canonical parsers + aliases recognised by the HTTP layer.
+        # Per-framework variants (e.g. checkov-k8s, checkov-dockerfile,
+        # trivy-cis, grype-sbom) are accepted and routed to the canonical
+        # parser in app._SCANNER_ALIASES.
         allowed = {
             # canonical
             "semgrep", "grype", "trivy", "gitleaks", "checkov", "zap", "sarif",
             # grype variants
-            "grype-image",
+            "grype-image", "grype-sbom",
             # trivy variants
-            "trivy-fs", "trivy-image", "trivy-config", "trivy-sarif",
+            "trivy-fs", "trivy-image", "trivy-config", "trivy-cis", "trivy-sarif",
+            # checkov framework variants
+            "checkov-k8s", "checkov-kubernetes", "checkov-dockerfile",
+            "checkov-terraform", "checkov-cloudformation", "checkov-helm",
+            "checkov-secrets",
             # SARIF-native tools
-            "hadolint", "spotbugs", "snyk", "bandit", "codeql", "semgrep-sarif",
+            "hadolint", "spotbugs", "spotbugs-xml", "snyk", "bandit", "codeql",
+            "semgrep-sarif",
         }
         if v not in allowed:
             raise ValueError(f"scanner must be one of {sorted(allowed)}")
