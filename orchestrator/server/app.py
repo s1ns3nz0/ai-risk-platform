@@ -386,10 +386,13 @@ def create_app(
         dependencies=auth,
     )
     def get_assessment_by_phase(name: str, assessment_id: str) -> Any:
-        """Group POA&M items by DevSecOps phase (BUILD/TEST/DEPLOY/OPERATE).
+        """Group POA&M items by DevSecOps phase.
 
-        Phase is sourced from each item's `source_detail.phase`, which the
-        POA&M engine derives from the assessment trigger
+        Phases follow the DoD DevSecOps Guidebook 6-phase model
+        (DEVELOP/BUILD/TEST/RELEASE/DELIVER/DEPLOY) plus OPERATE for cATO
+        continuous monitoring. Phase is sourced from each item's
+        `source_detail.phase`, which the POA&M engine derives from the
+        assessment trigger when the caller does not supply one explicitly
         (pre_merge→BUILD, pre_deploy→DEPLOY, periodic→OPERATE). Items with
         an unrecognised or missing phase fall under UNKNOWN.
         """
@@ -399,7 +402,8 @@ def create_app(
             raise HTTPException(status_code=404, detail="assessment not found")
         items = record.payload.get("poam", {}).get("items", [])
         groups: dict[str, list[dict[str, Any]]] = {
-            "BUILD": [], "TEST": [], "DEPLOY": [], "OPERATE": [],
+            "DEVELOP": [], "BUILD": [], "TEST": [], "RELEASE": [],
+            "DELIVER": [], "DEPLOY": [], "OPERATE": [],
         }
         for item in items:
             phase = ((item.get("source_detail") or {}).get("phase") or "").upper()

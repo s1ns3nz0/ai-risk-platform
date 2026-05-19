@@ -82,7 +82,9 @@ class ScannerResultPayload(BaseModel):
         return v
 
 
-DevSecOpsPhase = Literal["BUILD", "TEST", "RELEASE", "DELIVER", "DEPLOY", "OPERATE", "UNKNOWN"]
+DevSecOpsPhase = Literal[
+    "DEVELOP", "BUILD", "TEST", "RELEASE", "DELIVER", "DEPLOY", "OPERATE", "UNKNOWN",
+]
 
 
 class ImportAssessRequest(BaseModel):
@@ -102,11 +104,11 @@ class ImportAssessRequest(BaseModel):
     phase: DevSecOpsPhase | None = Field(
         default=None,
         description=(
-            "DevSecOps phase that produced these results: BUILD, TEST, RELEASE, "
-            "DELIVER, DEPLOY, OPERATE. When set, overrides the trigger-derived "
-            "default on every POA&M item's source_detail.phase. Falls back to "
-            "the trigger mapping (pre_merge→BUILD, pre_deploy→DEPLOY, "
-            "periodic→OPERATE) when omitted."
+            "DevSecOps phase that produced these results: DEVELOP, BUILD, TEST, "
+            "RELEASE, DELIVER, DEPLOY, OPERATE. When set, overrides the "
+            "trigger-derived default on every POA&M item's source_detail.phase. "
+            "Falls back to the trigger mapping (pre_merge→BUILD, "
+            "pre_deploy→DEPLOY, periodic→OPERATE) when omitted."
         ),
     )
     evidence_url: str = Field(
