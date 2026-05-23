@@ -82,3 +82,54 @@ def test_clean_gitleaks_sarif_credits_gitleaks():
     findings, submitted = _parse_payloads(payloads, state)
     assert findings == []
     assert "gitleaks" in submitted
+
+
+def test_kube_bench_text_routes_to_cis_parser():
+    """kube-bench plain-text payload yields a finding per [FAIL] line and
+    credits kube-bench in the submitted-scanners set."""
+    state = _FakeState()
+    payloads = [ScannerResultPayload(
+        scanner="kube-bench",
+        format="text",
+        content=(
+            "[PASS] 4.1.1 kubelet permissions\n"
+            "[FAIL] 4.1.3 proxy kubeconfig permissions wrong\n"
+            "[WARN] 4.1.5 kubeconfig ownership not root\n"
+        ),
+    )]
+    findings, submitted = _parse_payloads(payloads, state)
+    assert "kube-bench" in submitted
+    rule_ids = {f.rule_id for f in findings}
+    assert rule_ids == {"4.1.3", "4.1.5"}
+    assert all(f.source == "kube-bench" for f in findings)
+
+
+def test_cis_java_text_routes_to_cis_parser():
+    """cis-java plain-text payload — single FAIL produces a single finding."""
+    state = _FakeState()
+    payloads = [ScannerResultPayload(
+        scanner="cis-java",
+        format="text",
+        content=(
+            "[PASS] 1.1 java.security exists\n"
+            "[FAIL] 1.3 SHA-1 not in disabledAlgorithms\n"
+        ),
+    )]
+    findings, submitted = _parse_payloads(payloads, state)
+    assert "cis-java" in submitted
+    assert [f.rule_id for f in findings] == ["1.3"]
+    assert findings[0].severity == "medium"
+
+
+def test_clean_kube_bench_credits_scanner_with_zero_findings():
+    """A kube-bench run that's 100% PASS must still credit the scanner so the
+    SAR can mark CIS controls as 'satisfied' rather than 'not-assessed'."""
+    state = _FakeState()
+    payloads = [ScannerResultPayload(
+        scanner="kube-bench",
+        format="text",
+        content="[PASS] 4.1.1 ok\n[PASS] 4.1.2 ok\n",
+    )]
+    findings, submitted = _parse_payloads(payloads, state)
+    assert findings == []
+    assert "kube-bench" in submitted

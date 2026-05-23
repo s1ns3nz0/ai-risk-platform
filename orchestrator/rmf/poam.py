@@ -32,6 +32,8 @@ _SCAN_TYPE: dict[str, str] = {
     "checkov": "IaC",
     "hadolint": "IaC",
     "zap": "DAST",
+    "kube-bench": "CIS",   # CIS Kubernetes Benchmark — runtime hardening
+    "cis-java":   "CIS",   # CIS Java Runtime Environment Benchmark
     "sarif": "SAST",  # SARIF is universal — default to SAST for unclassified
 }
 
@@ -59,6 +61,8 @@ _SCANNER_CONTROL_MAP: dict[str, list[str]] = {
     "bandit":   ["SA-11", "SI-10"],
     "codeql":   ["SA-11", "SI-10"],
     "snyk":     ["RA-5", "SI-2", "SR-3"],
+    "kube-bench": ["CM-6", "SI-7"],     # k8s runtime hardening + integrity
+    "cis-java":   ["CM-6", "SC-13"],    # JRE config + crypto
 }
 
 
@@ -76,6 +80,8 @@ _SCANNER_FRAMEWORK_MAP: dict[str, list[str]] = {
     "bandit":   ["DoD Table 5/6", "SSDF PW.7"],
     "codeql":   ["DoD Table 5/6", "SSDF PW.7"],
     "snyk":     ["DoD Table 6/7", "SSDF RV.1"],
+    "kube-bench": ["CIS Kubernetes 1.10", "DoD Table 10", "SSDF PW.9"],
+    "cis-java":   ["CIS Java JRE", "DoD Table 6", "SSDF PW.9"],
 }
 
 

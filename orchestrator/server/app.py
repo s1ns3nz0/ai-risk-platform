@@ -719,16 +719,23 @@ def _parse_one_entry(
         logger.info("results[%d]: scanner alias %s → %s", idx, scanner, canonical)
     scanner = canonical
 
-    # String content is for XML scanners only (spotbugs). Skip otherwise.
+    # String content has three supported shapes:
+    #   * spotbugs        — raw or base64-encoded BugCollection XML
+    #   * kube-bench / cis-java — CIS-style [PASS]/[FAIL]/[WARN] plain text
+    #     (format="text" is the contract, but we infer from scanner name too
+    #     so callers don't have to set both fields).
     if isinstance(entry.content, str):
-        if scanner != "spotbugs":
-            logger.warning(
-                "results[%d] (scanner=%s): string content only supported for spotbugs — skipping",
-                idx, scanner,
-            )
-            return []
-        from orchestrator.scanners.spotbugs import SpotbugsScanner
-        return SpotbugsScanner(mapper).parse_output(entry.content)
+        if scanner == "spotbugs":
+            from orchestrator.scanners.spotbugs import SpotbugsScanner
+            return SpotbugsScanner(mapper).parse_output(entry.content)
+        if scanner in ("kube-bench", "cis-java"):
+            from orchestrator.parsers.cis_text import parse_cis_text
+            return parse_cis_text(entry.content, scanner, mapper)
+        logger.warning(
+            "results[%d] (scanner=%s): string content not supported for this scanner — skipping",
+            idx, scanner,
+        )
+        return []
 
     # Honor explicit format=sarif. Also auto-detect SARIF shape so a caller
     # that sends scanner=semgrep with SARIF content still routes correctly —

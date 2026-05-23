@@ -22,7 +22,9 @@ class ScannerResultPayload(BaseModel):
             "trivy-fs/-image/-config→trivy, trivy-sarif→sarif, "
             "hadolint/snyk/bandit/codeql/semgrep-sarif→sarif. "
             "Spotbugs accepts either SARIF (object/array) or raw/base64-encoded "
-            "XML (string). When omitted, the parser auto-detects from content."
+            "XML (string). CIS-style text scanners (kube-bench, cis-java) take "
+            "string content with format=\"text\". When omitted, the parser "
+            "auto-detects from content."
         ),
     )
     format: str | None = Field(
@@ -76,6 +78,10 @@ class ScannerResultPayload(BaseModel):
             # SARIF-native tools
             "hadolint", "spotbugs", "spotbugs-xml", "snyk", "bandit", "codeql",
             "semgrep-sarif",
+            # CIS-style plain-text scanners (format="text"). Each [FAIL]/[WARN]
+            # line becomes a Finding; PASS lines credit the control via the
+            # submitted-scanners set.
+            "kube-bench", "cis-java",
         }
         if v not in allowed:
             raise ValueError(f"scanner must be one of {sorted(allowed)}")
