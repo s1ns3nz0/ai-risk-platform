@@ -14,7 +14,7 @@ def _make_finding(**overrides: object) -> Finding:
         "file": "src/api/export.py",
         "line": 42,
         "message": "SQL injection detected",
-        "control_ids": ["PCI-DSS-6.3.1", "ASVS-V5.3.4"],
+        "control_ids": ["PCI-DSS-6.3.1", "SOC2-CC8.1"],
         "product": "payment-api",
     }
     defaults.update(overrides)
@@ -64,10 +64,10 @@ class TestFindingHashDeterministic:
 
 class TestFindingTagsIncludeControlIds:
     def test_control_ids_in_tags(self) -> None:
-        finding = _make_finding(control_ids=["PCI-DSS-6.3.1", "ASVS-V5.3.4"])
+        finding = _make_finding(control_ids=["PCI-DSS-6.3.1", "SOC2-CC8.1"])
         result = finding_to_defectdojo(finding)
         assert "PCI-DSS-6.3.1" in result["tags"]
-        assert "ASVS-V5.3.4" in result["tags"]
+        assert "SOC2-CC8.1" in result["tags"]
 
     def test_empty_control_ids(self) -> None:
         finding = _make_finding(control_ids=[])

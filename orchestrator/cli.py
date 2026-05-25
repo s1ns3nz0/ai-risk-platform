@@ -107,7 +107,7 @@ def init(output_dir: str | None) -> None:
 
     profile = {
         "risk_profile": {
-            "frameworks": ["pci-dss-4.0"] if "PCI" in data_class.upper() else ["asvs-4.0.3-L3"],
+            "frameworks": ["pci-dss-4.0"] if "PCI" in data_class.upper() else ["soc2-2017"],
             "risk_appetite": "conservative" if tier in (RiskTier.CRITICAL, RiskTier.HIGH) else "moderate",
             "thresholds": {
                 "critical": {"max_critical_findings": 0, "max_secrets_detected": 0, "action": action},
@@ -970,7 +970,7 @@ def threat_model_cmd(target_path: str, product: str, output: str) -> None:
 @cli.command("import-framework")
 @click.argument("source")
 @click.option("--framework-id", required=True, help="Framework identifier (e.g., cmmc-2.0-L2)")
-@click.option("--format", "fmt", default="oscal", type=click.Choice(["oscal", "asvs-json", "generic-json"]))
+@click.option("--format", "fmt", default="oscal", type=click.Choice(["oscal", "generic-json"]))
 @click.option("--output", default=None, help="Output YAML path (default: controls/baselines/{framework-id}.yaml)")
 @click.option("--suggest-scanners/--no-suggest-scanners", default=True, help="Auto-suggest scanner mappings via keyword matching")
 @click.option("--tiers", default="high,critical", help="Applicable tiers (comma-separated)")
@@ -990,8 +990,6 @@ def import_framework(
       orchestrator import-framework ./nist-800-53-catalog.json --framework-id nist-800-53-r5
 
       orchestrator import-framework https://raw.githubusercontent.com/... --framework-id nist-800-53-r5
-
-      orchestrator import-framework ./asvs.json --framework-id asvs-4.0.3-L2 --format asvs-json
 
       orchestrator import-framework ./cmmc.json --framework-id cmmc-2.0-L2 --no-suggest-scanners
     """
@@ -1016,9 +1014,6 @@ def import_framework(
             controls = parser.parse_url(source, framework_id)
         else:
             controls = parser.parse_file(source, framework_id)
-    elif fmt == "asvs-json":
-        gp = GenericFrameworkParser()
-        controls = gp.parse_asvs_json(source, level=3)
     else:
         gp = GenericFrameworkParser()
         controls = gp.parse_generic_json(source, framework_id=framework_id)

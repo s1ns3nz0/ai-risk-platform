@@ -123,8 +123,8 @@ class TestReadFindings:
         writer = JsonlWriter(str(out))
 
         writer.write_finding(_make_finding(control_ids=["PCI-DSS-6.3.1"]))
-        writer.write_finding(_make_finding(control_ids=["ASVS-V5.3.4"]))
-        writer.write_finding(_make_finding(control_ids=["PCI-DSS-6.3.1", "ASVS-V5.3.4"]))
+        writer.write_finding(_make_finding(control_ids=["SOC2-CC8.1"]))
+        writer.write_finding(_make_finding(control_ids=["PCI-DSS-6.3.1", "SOC2-CC8.1"]))
 
         results = writer.read_findings(control_id="PCI-DSS-6.3.1")
         assert len(results) == 2

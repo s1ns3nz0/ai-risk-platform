@@ -46,7 +46,7 @@ def _make_findings() -> list[Finding]:
             file="requirements.txt",
             line=0,
             message="cryptography < 42.0.0 vulnerable",
-            control_ids=["PCI-DSS-6.3.1", "ASVS-V14.2.1"],
+            control_ids=["PCI-DSS-6.3.1", "SOC2-CC7.1"],
             product="payment-api",
             package="cryptography",
             installed_version="41.0.0",
@@ -258,7 +258,7 @@ def _patch_risk_assess_pipeline(
 
         # Profile
         profile = MagicMock()
-        profile.frameworks = ["pci-dss-4.0", "asvs-5.0-L3"]
+        profile.frameworks = ["pci-dss-4.0", "soc2-2017"]
         mocks["load_profile"].return_value = profile
 
         # Controls repo

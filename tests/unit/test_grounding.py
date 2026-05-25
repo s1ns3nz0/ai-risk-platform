@@ -110,12 +110,12 @@ class TestGroundingValidation:
 
         assert result.valid
 
-    def test_handles_fisc_control_ids(self) -> None:
+    def test_handles_iso27001_control_ids(self) -> None:
         ai_output = {
-            "executive_summary": "This violates FISC-実127",
+            "executive_summary": "This violates ISO27001-A.5.17",
         }
         findings = [_make_finding()]
-        controls = [_make_control("FISC-実127")]
+        controls = [_make_control("ISO27001-A.5.17")]
 
         result = validate_grounding(ai_output, findings, controls)
 

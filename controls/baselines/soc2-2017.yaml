@@ -1,0 +1,262 @@
+# SOC 2 (Trust Services Criteria) Baseline Controls
+# Source: AICPA Trust Services Criteria — 2017 (as revised)
+# Reference: https://www.aicpa-cima.com/topic/audit-assurance/audit-and-assurance-greater-than-soc-2
+#
+# CC = Common Criteria. Only includes criteria verifiable by automated scanners.
+# Items requiring procedural verification (vendor management, HR, etc.) are excluded.
+controls:
+
+  # ──────────────────────────────────────────────────────────
+  # CC6: Logical and Physical Access Controls
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "SOC2-CC6.1"
+      title: "Logical access security — restrict access to information assets"
+      framework: "soc2-2017"
+      description: "Implements logical access security software, infrastructure, and architectures over protected information assets to protect them from security events to meet the entity's objectives."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_1"    # IAM policies not applied to individual users
+            - "CKV_AWS_40"   # IAM policies attached only to groups or roles
+            - "CKV_AWS_46"   # No IAM policies with admin privileges
+            - "CKV_AWS_62"   # No IAM policies with wildcard principal
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "SOC2-CC6.2"
+      title: "User registration and authentication"
+      framework: "soc2-2017"
+      description: "Prior to issuing system credentials and granting system access, the entity registers and authorizes new internal and external users. Credentials are removed when no longer required."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.hardcoded-password.*"
+            - "generic.secrets.security.detected-generic-password.*"
+        - scanner: gitleaks
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "SOC2-CC6.3"
+      title: "Role-based authorization and least privilege"
+      framework: "soc2-2017"
+      description: "Authorizes, modifies, or removes access to data, software, functions, and other protected information assets based on roles, responsibilities, or the system design and changes."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_40"
+            - "CKV_AWS_61"   # IAM policy does not grant AssumeRole on all
+            - "CKV_AWS_273"  # Access through SSO
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "SOC2-CC6.6"
+      title: "Network boundary protection"
+      framework: "soc2-2017"
+      description: "Implements logical access security measures to protect against threats from sources outside its system boundaries."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_24"   # No ingress from 0.0.0.0/0 to port 22
+            - "CKV_AWS_25"   # No ingress from 0.0.0.0/0 to port 3389
+            - "CKV2_AWS_12"  # Default VPC does not exist
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "SOC2-CC6.7"
+      title: "Transmission of data — encryption in transit"
+      framework: "soc2-2017"
+      description: "Restricts the transmission, movement, and removal of information to authorized internal and external users and processes, and protects it during transmission, movement, or removal."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_19"   # S3 server-side encryption
+            - "CKV_AWS_145"  # S3 encrypted with KMS
+        - scanner: semgrep
+          rules:
+            - "python.cryptography.security.*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "SOC2-CC6.8"
+      title: "Prevention and detection of unauthorized or malicious software"
+      framework: "soc2-2017"
+      description: "Implements controls to prevent or detect and act upon the introduction of unauthorized or malicious software to meet the entity's objectives."
+      verification_methods:
+        - scanner: grype
+          severity_threshold: high
+        - scanner: trivy
+          severity_threshold: high
+        - scanner: sbom
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # CC7: System Operations
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "SOC2-CC7.1"
+      title: "Vulnerability detection and configuration monitoring"
+      framework: "soc2-2017"
+      description: "To meet its objectives, the entity uses detection and monitoring procedures to identify (1) changes to configurations that result in the introduction of new vulnerabilities, and (2) susceptibilities to newly discovered vulnerabilities."
+      verification_methods:
+        - scanner: grype
+          severity_threshold: high
+        - scanner: trivy
+          severity_threshold: high
+        - scanner: checkov
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "SOC2-CC7.2"
+      title: "Security event monitoring and anomaly detection"
+      framework: "soc2-2017"
+      description: "Monitors system components and the operation of those components for anomalies that are indicative of malicious acts, natural disasters, and errors affecting the entity's ability to meet its objectives. Anomalies are analyzed to determine whether they represent security events."
+      verification_methods:
+        - scanner: sigma
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_67"   # CloudTrail enabled in all regions
+            - "CKV_AWS_150"  # VPC flow log enabled
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "SOC2-CC7.3"
+      title: "Security incident evaluation and response"
+      framework: "soc2-2017"
+      description: "Evaluates security events to determine whether they could or have resulted in a failure of the entity to meet its objectives (security incidents) and, if so, takes actions to prevent or address such failures."
+      verification_methods:
+        - scanner: sigma
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_36"   # CloudTrail log file validation
+            - "CKV_AWS_18"   # S3 bucket access logging
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # CC8: Change Management
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "SOC2-CC8.1"
+      title: "Change management — authorize, design, develop, test, and deploy changes"
+      framework: "soc2-2017"
+      description: "Authorizes, designs, develops or acquires, configures, documents, tests, approves, and implements changes to infrastructure, data, software, and procedures to meet its objectives."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.injection.*"
+        - scanner: checkov
+        - scanner: hadolint
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # Confidentiality criteria
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "SOC2-C1.1"
+      title: "Identification and maintenance of confidential information"
+      framework: "soc2-2017"
+      description: "Identifies and maintains confidential information to meet the entity's objectives related to confidentiality."
+      verification_methods:
+        - scanner: gitleaks
+        - scanner: semgrep
+          rules:
+            - "generic.secrets.security.detected-*"
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required
+
+  - control:
+      id: "SOC2-C1.2"
+      title: "Disposal of confidential information"
+      framework: "soc2-2017"
+      description: "Disposes of confidential information to meet the entity's objectives related to confidentiality."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_21"   # S3 bucket versioning
+            - "CKV_AWS_19"   # S3 server-side encryption
+      applicable_tiers: [high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # Processing Integrity criteria
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "SOC2-PI1.4"
+      title: "Input validation and data integrity"
+      framework: "soc2-2017"
+      description: "Implements policies and procedures to make available or deliver output completely, accurately, and timely in accordance with specifications to meet the entity's objectives."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.injection.*"
+            - "python.lang.security.audit.formatted-sql-query.*"
+        - scanner: codeql
+      applicable_tiers: [medium, high, critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: required
+        high: required
+        critical: required

@@ -81,7 +81,7 @@ class TestBuildInputFormat:
         context = {
             "product": "payment-api",
             "tier": "critical",
-            "frameworks": ["pci-dss-4.0", "asvs-4.0.3-L3"],
+            "frameworks": ["pci-dss-4.0", "soc2-2017"],
             "findings_count": {"critical": 1, "high": 1},
             "pci_scope_count": 1,
             "secrets_count": 1,
@@ -94,7 +94,7 @@ class TestBuildInputFormat:
         assert len(input_data["findings"]) == 2
         assert input_data["context"]["product"] == "payment-api"
         assert input_data["context"]["tier"] == "critical"
-        assert input_data["context"]["frameworks"] == ["pci-dss-4.0", "asvs-4.0.3-L3"]
+        assert input_data["context"]["frameworks"] == ["pci-dss-4.0", "soc2-2017"]
 
         # Verify finding structure
         f0 = input_data["findings"][0]

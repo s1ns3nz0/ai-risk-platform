@@ -79,7 +79,7 @@ def test_rule_has_control_ids(engine: SigmaEngine) -> None:
     """매칭된 rule에 control_ids 포함."""
     entry = {"event_type": "login_failed", "username": "admin", "ip": "10.0.0.1"}
     matches = engine.evaluate(entry)
-    assert matches[0].rule.control_ids == ["PCI-DSS-10.2.1", "FISC-実127"]
+    assert matches[0].rule.control_ids == ["PCI-DSS-10.2.1", "ISO27001-A.5.17"]
 
 
 def test_rule_has_attack_tags(engine: SigmaEngine) -> None:

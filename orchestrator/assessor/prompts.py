@@ -20,7 +20,7 @@ Risk tier definitions:
 - LOW: No sensitive data, internal tools
 - MEDIUM: PII or moderate sensitivity
 - HIGH: PCI cardholder data, financial data
-- CRITICAL: PCI + regulated jurisdiction (JP/FISC)
+- CRITICAL: PCI + multi-framework assurance (PCI DSS + SOC 2 + ISO 27001)
 
 Respond in JSON:
 {{"tier": "high", "reasoning": "...", "threat_profile": ["T1190", "T1078"]}}

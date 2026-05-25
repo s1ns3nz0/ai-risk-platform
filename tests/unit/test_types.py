@@ -27,7 +27,7 @@ class TestProductManifest:
     def test_creation(self, sample_manifest: ProductManifest) -> None:
         assert sample_manifest.name == "payment-api"
         assert sample_manifest.data_classification == ["PCI", "PII-financial"]
-        assert sample_manifest.jurisdiction == ["JP"]
+        assert sample_manifest.jurisdiction == ["US"]
         assert sample_manifest.deployment["cloud"] == "AWS"
 
     def test_integrations_default(self) -> None:

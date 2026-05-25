@@ -233,47 +233,6 @@ class TestBaselineGenerator:
 # ── GenericFrameworkParser ────────────────────────────────────
 
 
-class TestGenericFrameworkParserAsvs:
-    """test_parse_asvs_json — ASVS JSON 파싱."""
-
-    def test_parse_asvs_json_all_levels(self) -> None:
-        parser = GenericFrameworkParser()
-        controls = parser.parse_asvs_json(
-            str(FIXTURES / "asvs-sample.json"), level=3
-        )
-        assert len(controls) == 3
-
-    def test_parse_asvs_json_level_filter(self) -> None:
-        parser = GenericFrameworkParser()
-        controls = parser.parse_asvs_json(
-            str(FIXTURES / "asvs-sample.json"), level=1
-        )
-        # Only V2.1.1 is required at L1
-        assert len(controls) == 1
-        assert controls[0].id == "V2.1.1"
-
-    def test_parse_asvs_json_level2(self) -> None:
-        parser = GenericFrameworkParser()
-        controls = parser.parse_asvs_json(
-            str(FIXTURES / "asvs-sample.json"), level=2
-        )
-        # V2.1.1 and V5.3.4 are required at L2
-        assert len(controls) == 2
-        ids = [c.id for c in controls]
-        assert "V2.1.1" in ids
-        assert "V5.3.4" in ids
-
-    def test_asvs_control_fields(self) -> None:
-        parser = GenericFrameworkParser()
-        controls = parser.parse_asvs_json(
-            str(FIXTURES / "asvs-sample.json"), level=3
-        )
-        v2 = next(c for c in controls if c.id == "V2.1.1")
-        assert v2.title == "Password Security"
-        assert v2.framework == "owasp-asvs"
-        assert "12 characters" in v2.description
-
-
 class TestGenericFrameworkParserGenericJson:
     """parse_generic_json — 커스텀 JSON 매핑."""
 

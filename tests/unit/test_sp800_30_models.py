@@ -62,7 +62,7 @@ def _make_impact(**overrides: object) -> ImpactAssessment:
             "availability": "moderate",
         },
         "severity": "high",
-        "compliance_impact": ["PCI-DSS-6.3.1", "ASVS-V5.3.4"],
+        "compliance_impact": ["PCI-DSS-6.3.1", "SOC2-CC8.1"],
         "business_impact": "Cardholder data exposure, PCI non-compliance",
         "evidence": "PCI-scoped API handling financial transactions",
     }

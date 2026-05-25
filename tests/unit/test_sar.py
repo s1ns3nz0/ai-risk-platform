@@ -83,7 +83,7 @@ def _mini_repo_with_controls(controls: list[Control]) -> ControlsRepository:
 
 
 def test_sar_has_all_controls() -> None:
-    """SAR should assess all 102 controls from the repository."""
+    """SAR should assess every control loaded from the repository."""
     repo = _make_controls_repo()
     gen = SARGenerator(repo)
 
@@ -93,8 +93,9 @@ def test_sar_has_all_controls() -> None:
         gate_decision=_make_gate_decision(passed=True),
     )
 
-    assert sar.total_controls == 102
-    assert len(sar.control_assessments) == 102
+    expected = len(repo.controls)
+    assert sar.total_controls == expected
+    assert len(sar.control_assessments) == expected
 
 
 def test_satisfied_when_scanner_ran_no_issues() -> None:
@@ -194,7 +195,7 @@ def test_satisfied_when_scanner_submitted_zero_findings() -> None:
     scanners_that_ran was inferred from finding.source. A clean scan must
     credit the control.
     """
-    ctrl = _make_control(control_id="ASVS-V2.10.4", scanner="gitleaks")
+    ctrl = _make_control(control_id="SOC2-CC6.2", scanner="gitleaks")
     repo = _mini_repo_with_controls([ctrl])
     gen = SARGenerator(repo)
 
@@ -254,9 +255,9 @@ def test_submitted_scanners_union_with_finding_sources() -> None:
 def test_not_assessed_when_no_verification_methods() -> None:
     """Control with no verification_methods -> not-assessed (manual only)."""
     ctrl = Control(
-        id="FISC-manual",
+        id="ISO27001-manual",
         title="Manual control",
-        framework="fisc-safety",
+        framework="iso27001",
         description="Requires manual review",
         verification_methods=[],
         applicable_tiers=[RiskTier.CRITICAL],

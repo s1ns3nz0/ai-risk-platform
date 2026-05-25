@@ -111,6 +111,7 @@ Line: {line}
 Message: {message}
 Control IDs: {control_ids}
 {package_info}
+{vex_info}
 
 ## Mapped Controls
 {controls_text}
@@ -171,6 +172,13 @@ SUMMARY_USER_PROMPT = """\
 ## Finding Statistics
 Total findings: {total_findings}
 Severity breakdown: {severity_breakdown}
+
+## VEX Triage (CycloneDX VEX)
+{vex_text}
+
+When VEX is provided, the SBOM maturity has reached Level 4 (Generate → Scan → Attest → Triage/VEX).
+Mention this in the executive summary, name the count of CVEs suppressed via `not_affected` with their
+justifications, and list any `affected` CVEs that still have a fix available.
 
 Synthesize the above per-finding assessments into a cross-signal executive summary.
 Identify attack chains and compound risks that individual assessments cannot capture.
@@ -248,6 +256,21 @@ def build_per_finding_prompts(
     else:
         package_info = ""
 
+    # VEX triage (CycloneDX). Surfaces `affected` / `in_triage` etc. to the
+    # model so per-finding narratives can cite triage rationale. Actionable
+    # filter already removed `not_affected` before this point.
+    vex_status = finding.get("vex_status", "no_vex")
+    if vex_status and vex_status != "no_vex":
+        vex_info = f"VEX Status: {vex_status}"
+        jx = finding.get("vex_justification") or ""
+        detail = finding.get("vex_detail") or ""
+        if jx:
+            vex_info += f"\nVEX Justification: {jx}"
+        if detail:
+            vex_info += f"\nVEX Detail: {detail}"
+    else:
+        vex_info = ""
+
     # Control IDs as string
     control_ids = finding.get("control_ids", [])
     control_ids_str = ", ".join(str(c) for c in control_ids) if control_ids else "unmapped"
@@ -264,6 +287,7 @@ def build_per_finding_prompts(
         message=finding.get("message", ""),
         control_ids=control_ids_str,
         package_info=package_info,
+        vex_info=vex_info,
         controls_text=controls_text,
         epss_text=epss_text,
         te_id=te_id,
@@ -277,6 +301,7 @@ def build_summary_prompts(
     per_finding_results: list[dict[str, Any]],
     total_findings: int,
     severity_counts: dict[str, int],
+    vex_summary: Any = None,
 ) -> tuple[str, str]:
     """Build (system_prompt, user_prompt) for summary synthesis.
 
@@ -288,6 +313,7 @@ def build_summary_prompts(
         per_finding_results: List of per-finding assessment result dicts.
         total_findings: Total number of findings (not just assessed ones).
         severity_counts: Counts by severity level.
+        vex_summary: Optional VexSummary; surfaces VEX triage to the prompt.
 
     Returns:
         (system_prompt, user_prompt) tuple for stream_with_cache().
@@ -303,6 +329,37 @@ def build_summary_prompts(
         per_finding_json=json.dumps(per_finding_results, indent=2),
         total_findings=total_findings,
         severity_breakdown=severity_breakdown,
+        vex_text=_render_vex_text(vex_summary),
     )
 
     return system_prompt, user_prompt
+
+
+def _render_vex_text(vex_summary: Any) -> str:
+    """Render a compact VEX block for the summary user prompt."""
+    if vex_summary is None or not getattr(vex_summary, "vex_provided", False):
+        return "No VEX document provided (SBOM maturity Level ≤ 3 — no triage data)."
+
+    lines = [
+        f"SBOM maturity: Level 4 (Generate → Scan → Attest → Triage).",
+        f"Total findings: {vex_summary.total_findings}",
+        f"Actionable: {vex_summary.actionable}",
+        f"Not affected (suppressed): {vex_summary.not_affected}",
+        f"Affected: {vex_summary.affected}",
+        f"In triage: {vex_summary.in_triage}",
+        f"Fixed: {vex_summary.fixed}",
+        f"Under investigation: {vex_summary.under_investigation}",
+        f"No VEX entry: {vex_summary.no_vex}",
+    ]
+    suppressed = list(vex_summary.suppressed_cves or [])
+    if suppressed:
+        lines.append("\nSuppressed CVEs (not_affected):")
+        for s in suppressed:
+            jx = s.get("justification") or "no-justification"
+            pkg = s.get("package") or "unknown-package"
+            detail = s.get("detail") or ""
+            line = f"  - {s.get('id', '?')} on {pkg}: {jx}"
+            if detail:
+                line += f" — {detail}"
+            lines.append(line)
+    return "\n".join(lines)

@@ -21,7 +21,7 @@ def _make_manifest(
         name="payment-api",
         description="QR code payment confirmation service",
         data_classification=data_classification or ["PCI", "PII-financial"],
-        jurisdiction=jurisdiction or ["JP"],
+        jurisdiction=jurisdiction or ["US"],
         deployment={"cloud": "AWS", "compute": "EKS", "region": "ap-northeast-1"},
         integrations=["external-payment-gateway"],
     )
@@ -73,7 +73,7 @@ class TestCategorizeAiResponse:
     def test_categorize_parses_ai_response(self) -> None:
         response = json.dumps({
             "tier": "critical",
-            "reasoning": "PCI cardholder data in JP jurisdiction under FISC regulation.",
+            "reasoning": "PCI cardholder data with SOC 2 and ISO 27001 compliance requirements.",
             "threat_profile": ["T1190", "T1078"],
         })
         client = _mock_client(response)
@@ -92,7 +92,7 @@ class TestCategorizeFallbackOnFailure:
         fallback = StaticRiskAssessor()
         assessor = BedrockRiskAssessor(client=client, fallback=fallback)
 
-        manifest = _make_manifest(data_classification=["PCI"], jurisdiction=["JP"])
+        manifest = _make_manifest(data_classification=["PCI"], jurisdiction=["US"])
         tier = assessor.categorize(manifest)
 
         assert tier == RiskTier.CRITICAL  # StaticRiskAssessor result
@@ -107,7 +107,7 @@ class TestCategorizeFallbackOnInvalidJson:
         manifest = _make_manifest(data_classification=["PCI"], jurisdiction=["US"])
         tier = assessor.categorize(manifest)
 
-        assert tier == RiskTier.HIGH  # StaticRiskAssessor: PCI without JP → HIGH
+        assert tier == RiskTier.CRITICAL  # PCI → pci-dss + soc2 + iso27001 (3 frameworks)
 
 
 class TestAssessCombinesScoreAndNarrative:

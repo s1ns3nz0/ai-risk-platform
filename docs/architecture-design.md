@@ -4,7 +4,7 @@
 
 This document specifies the design of a centralized, in-house DevSecOps platform for regulated fintech organizations (crypto exchange, payment service, digital bank).
 
-The platform inverts the default assumption of most Application Security Posture Management (ASPM) tools. Instead of aggregating scanner output first and mapping to compliance frameworks as an afterthought, this platform starts from the compliance framework (NIST CSF, CIS Controls, PCI DSS, FISC, OWASP ASVS) and derives the verification activities — SAST, DAST, IaC policy, SCA, runtime detection — from the applicable controls.
+The platform inverts the default assumption of most Application Security Posture Management (ASPM) tools. Instead of aggregating scanner output first and mapping to compliance frameworks as an afterthought, this platform starts from the compliance framework (NIST CSF, CIS Controls, PCI DSS, SOC 2, ISO 27001) and derives the verification activities — SAST, DAST, IaC policy, SCA, runtime detection — from the applicable controls.
 
 The AI layer, hosted on AWS Bedrock, is deliberately scoped to a **contextual translator** role. It never acts as a scanner, nor does it close policy gates. Deterministic rule engines (OPA/Rego, YAML thresholds, Checkov hard-fail) retain exclusive authority over block/allow decisions. This is a critical design constraint for auditability in regulated environments.
 
@@ -50,9 +50,9 @@ AWS-centric cloud platform engineering with Terraform, GitHub Actions, ArgoCD, W
 
 ### Money Forward — Product Security Specialist, Digital Bank
 
-Product security for SMBC-partnered digital bank. NIST CSF, CIS Controls, FISC, DevSecOps tooling.
+Product security for SMBC-partnered digital bank. NIST CSF, CIS Controls, SOC 2, ISO 27001, DevSecOps tooling.
 
-**Alignment:** NIST CSF and CIS Controls as native baselines, FISC mapping, architecture review support.
+**Alignment:** NIST CSF and CIS Controls as native baselines, SOC 2 + ISO 27001 mapping, architecture review support.
 
 ---
 
@@ -134,7 +134,7 @@ Likelihood = f(
 Impact = f(
   data_classification,              # PCI > PII-financial > PII-general > public
   control_coverage,                 # required controls vs covered ratio
-  jurisdiction_sensitivity          # JP(FISC) > EU(GDPR) > other
+  jurisdiction_sensitivity          # EU(GDPR) > US > other
 )
 ```
 
@@ -171,7 +171,7 @@ These are the specific capabilities AI provides that static analysis cannot:
 
 2. **VEX exploitability reasoning.** AI performs reachability analysis combining CVE details with codebase. "CVE-2025-XXXX affects lodash.merge but this codebase only uses lodash.get. The vulnerable function is not in any execution path. EPSS score 0.03. Recommend VEX status: not_affected."
 
-3. **Semantic security review.** AI catches logic-level issues that pattern-matching scanners miss. "This PR changes JWT validation from RS256 to HS256. This is a cryptographic downgrade violating ASVS-V3.5.1."
+3. **Semantic security review.** AI catches logic-level issues that pattern-matching scanners miss. "This PR changes JWT validation from RS256 to HS256. This is a cryptographic downgrade violating SOC2-CC6.3."
 
 ### Two-Stage Pipeline (MVP tier)
 
@@ -234,10 +234,10 @@ Never an AI inference.
 
 | Scanner | Category | Gate? | Control Examples |
 |---|---|---|---|
-| Checkov | IaC | Yes | PCI-DSS-1.3.1, FISC-実119 |
-| Semgrep | SAST | Yes | PCI-DSS-6.3.1, ASVS-V5.3.4 |
-| Grype | SCA | Yes | PCI-DSS-6.3.1, ASVS-V14.2.1 |
-| Gitleaks | Secrets | Yes | PCI-DSS-3.5.1, ASVS-V2.10.1 |
+| Checkov | IaC | Yes | PCI-DSS-1.3.1, ISO27001-A.8.22 |
+| Semgrep | SAST | Yes | PCI-DSS-6.3.1, SOC2-CC8.1 |
+| Grype | SCA | Yes | PCI-DSS-6.3.1, SOC2-CC7.1 |
+| Gitleaks | Secrets | Yes | PCI-DSS-3.5.1, SOC2-CC6.2 |
 
 ### Future Scanners (planned, not yet implemented)
 
@@ -256,7 +256,7 @@ Finding(
     source="checkov",
     rule_id="CKV_AWS_19",
     severity="high",
-    control_ids=["PCI-DSS-3.5.1", "FISC-実119"],  # mapped from controls YAML
+    control_ids=["PCI-DSS-3.5.1", "ISO27001-A.8.24"],  # mapped from controls YAML
     product="payment-api"
 )
 ```
@@ -278,9 +278,9 @@ Supported: field matching, `|contains`/`|startswith`/`|endswith` modifiers, AND/
 | Rule | ATT&CK | Control ID |
 |---|---|---|
 | Brute force login | T1110 | PCI-DSS-10.2.1 |
-| SQL injection attempt | T1190 | PCI-DSS-6.3.1, ASVS-V5.3.4 |
+| SQL injection attempt | T1190 | PCI-DSS-6.3.1, SOC2-CC8.1 |
 | Data exfiltration | T1048 | PCI-DSS-10.2.1 |
-| Privilege escalation | T1078 | FISC-実121 |
+| Privilege escalation | T1078 | ISO27001-A.5.15 |
 
 Each rule is tagged with ATT&CK technique IDs and Control IDs, enabling coverage dashboards.
 
@@ -315,14 +315,14 @@ Produces a JSON report with:
 
 ## 11. End-to-End Scenario
 
-### Payment API — QR Code Payment Confirmation (PCI + FISC scope)
+### Payment API — QR Code Payment Confirmation (PCI + SOC 2 + ISO 27001 scope)
 
 **Step 1 — Categorization (RMF Step 2)**
 Product manifest declares: PCI data, PII-financial, Japan jurisdiction.
 Risk tier: CRITICAL.
 
 **Step 2 — Baseline Selection (RMF Step 3)**
-13 controls auto-selected: PCI-DSS (6) + ASVS (4) + FISC (3).
+13 controls auto-selected: PCI DSS + SOC 2 + ISO 27001.
 
 **Step 3 — Scanning (RMF Step 5)**
 Checkov: 20 IaC findings. Grype: 20 dependency CVEs. Gitleaks: 1 hardcoded key.

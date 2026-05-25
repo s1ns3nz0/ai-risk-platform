@@ -21,7 +21,7 @@ def _make_manifest() -> ProductManifest:
         name="payment-api",
         description="QR code payment confirmation service",
         data_classification=["PCI", "PII-financial"],
-        jurisdiction=["JP"],
+        jurisdiction=["US"],
         deployment={"cloud": "AWS", "compute": "EKS", "region": "ap-northeast-1"},
         integrations=["external-payment-gateway"],
         impact_levels={
@@ -41,7 +41,7 @@ def _make_findings() -> list[Finding]:
             file="src/api/export.py",
             line=42,
             message="SQL injection via string concatenation",
-            control_ids=["PCI-DSS-6.3.1", "ASVS-V5.3.4"],
+            control_ids=["PCI-DSS-6.3.1", "SOC2-CC8.1"],
             product="payment-api",
         ),
         Finding(
@@ -97,7 +97,7 @@ def _make_findings() -> list[Finding]:
             file="src/api/auth.py",
             line=15,
             message="Logging sensitive data",
-            control_ids=["ASVS-V2.10.1"],
+            control_ids=["SOC2-CC6.2"],
             product="payment-api",
         ),
     ]
@@ -159,9 +159,9 @@ def _make_controls() -> list[Control]:
             applicable_tiers=[RiskTier.HIGH, RiskTier.CRITICAL],
         ),
         Control(
-            id="ASVS-V5.3.4",
+            id="SOC2-CC8.1",
             title="Output Encoding",
-            framework="asvs-5.0-L3",
+            framework="soc2-2017",
             description="Verify output encoding to prevent injection",
             verification_methods=[
                 VerificationMethod(scanner="semgrep"),
@@ -217,7 +217,7 @@ def _mock_bedrock_assess_response() -> str:
                 "impact_type": "harm to operations",
                 "cia_impact": {"confidentiality": "high", "integrity": "high", "availability": "moderate"},
                 "severity": "high",
-                "compliance_impact": ["PCI-DSS-6.3.1", "ASVS-V5.3.4"],
+                "compliance_impact": ["PCI-DSS-6.3.1", "SOC2-CC8.1"],
                 "business_impact": "Cardholder data exposure, PCI non-compliance",
                 "evidence": "PCI-scoped API with SQL injection",
             },
@@ -282,7 +282,7 @@ def _mock_per_finding_response(idx: int) -> str:
             "impact_type": "harm to operations",
             "cia_impact": {"confidentiality": "high", "integrity": "high", "availability": "moderate"},
             "severity": "high",
-            "compliance_impact": ["PCI-DSS-6.3.1", "ASVS-V5.3.4"],
+            "compliance_impact": ["PCI-DSS-6.3.1", "SOC2-CC8.1"],
             "business_impact": "Cardholder data exposure",
             "evidence": "PCI-scoped API",
         },

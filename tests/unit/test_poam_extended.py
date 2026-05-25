@@ -35,7 +35,7 @@ def _make_manifest() -> ProductManifest:
         name="payment-api",
         description="QR payment service",
         data_classification=["PCI", "PII-financial"],
-        jurisdiction=["JP"],
+        jurisdiction=["US"],
         deployment={"cloud": "AWS"},
         impact_levels={"confidentiality": "high", "integrity": "high", "availability": "moderate"},
     )

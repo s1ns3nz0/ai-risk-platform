@@ -22,7 +22,7 @@ Compliance가 프로세스를 결정한다. MVP-0 우선 구현. 복잡성은 �
 
 ### ADR-004: AI는 gate하지 않는다
 **결정**: AI의 gate_recommendation은 advisory only. 실제 차단은 YAML threshold + OPA/Rego가 수행.
-**이유**: 규제 감사에서 "왜 이 PR이 차단되었나?"에 대한 답은 사람이 읽을 수 있는 정책 참조여야 한다. AI inference가 아니라. PCI DSS, FISC 감사 생존을 위한 핵심 설계 제약.
+**이유**: 규제 감사에서 "왜 이 PR이 차단되었나?"에 대한 답은 사람이 읽을 수 있는 정책 참조여야 한다. AI inference가 아니라. PCI DSS, SOC 2, ISO 27001 감사 생존을 위한 핵심 설계 제약.
 **트레이드오프**: AI가 높은 리스크를 감지해도 정책 위반이 아니면 차단할 수 없음. Social gate (PR comment)로만 작용.
 
 ### ADR-005: Grype가 SCA gate, Dependency-Track은 enrichment만

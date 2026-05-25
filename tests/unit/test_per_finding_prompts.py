@@ -11,7 +11,7 @@ def _make_manifest() -> ProductManifest:
         name="payment-api",
         description="QR code payment processing API",
         data_classification=["PCI", "PII-financial"],
-        jurisdiction=["JP"],
+        jurisdiction=["US"],
         deployment={"cloud": "aws", "region": "ap-northeast-1"},
         impact_levels={
             "confidentiality": "high",
@@ -29,7 +29,7 @@ def _make_finding() -> dict[str, object]:
         "file": "src/api/export.py",
         "line": 42,
         "message": "SQL injection via string concatenation",
-        "control_ids": ["PCI-DSS-6.3.1", "ASVS-V5.3.4"],
+        "control_ids": ["PCI-DSS-6.3.1", "SOC2-CC8.1"],
         "package": "",
         "installed_version": "",
         "fixed_version": "",

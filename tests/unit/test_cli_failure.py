@@ -52,7 +52,7 @@ def _setup_product_files(
             "name": "payment-api",
             "description": "test",
             "data_classification": ["PCI"],
-            "jurisdiction": ["JP"],
+            "jurisdiction": ["US"],
             "deployment": {"cloud": "AWS", "compute": "EKS", "region": "ap-northeast-1"},
             "integrations": [],
         }
@@ -188,7 +188,7 @@ class TestAssessWarnsOnScannerFailureMediumTier:
                 "name": "payment-api",
                 "description": "test",
                 "data_classification": ["public"],
-                "jurisdiction": ["JP"],
+                "jurisdiction": ["US"],
                 "deployment": {"cloud": "AWS", "compute": "EKS", "region": "ap-northeast-1"},
                 "integrations": [],
             }

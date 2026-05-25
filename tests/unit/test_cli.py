@@ -56,7 +56,7 @@ class TestInitCommand:
             "my-service",           # product name
             "A test service",       # description
             "PCI",                  # data classification
-            "JP",                   # jurisdiction
+            "US",                   # jurisdiction
             "AWS",                  # cloud
             "EKS",                  # compute
             "ap-northeast-1",       # region
@@ -150,7 +150,7 @@ class TestAssessCommand:
                 "name": "payment-api",
                 "description": "test",
                 "data_classification": ["PCI"],
-                "jurisdiction": ["JP"],
+                "jurisdiction": ["US"],
                 "deployment": {"cloud": "AWS", "compute": "EKS", "region": "ap-northeast-1"},
                 "integrations": [],
             }
@@ -282,7 +282,7 @@ class TestDetectCommand:
                 "condition": "selection",
             },
             "tags": ["attack.initial_access"],
-            "control_ids": ["ASVS-V2.10.1"],
+            "control_ids": ["SOC2-CC6.2"],
         }
         import yaml
         (rules_dir / "test_rule.yml").write_text(yaml.dump(rule))

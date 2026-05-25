@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
@@ -31,6 +31,12 @@ from orchestrator.types import (
     RiskTier,
     is_secret_finding,
 )
+from orchestrator.vex import (
+    VexSummary,
+    actionable_findings,
+    apply_vex,
+    parse_vex_request,
+)
 
 
 @dataclass
@@ -49,8 +55,16 @@ class AssessmentResult:
     duration_seconds: float
     assessment_id: str = ""
     created_at: str = ""
+    vex_summary: VexSummary = field(default_factory=VexSummary)
 
     def to_dict(self) -> dict[str, Any]:
+        # findings_count reports the *actionable* count — VEX-suppressed
+        # (not_affected) entries don't drive remediation work. The full
+        # roster is still visible via vex_summary.total_findings.
+        if self.vex_summary.vex_provided:
+            findings_count = self.vex_summary.actionable
+        else:
+            findings_count = len(self.findings)
         return {
             "assessment_id": self.assessment_id,
             "created_at": self.created_at,
@@ -58,7 +72,7 @@ class AssessmentResult:
             "tier": self.tier,
             "mode": self.mode,
             "duration_seconds": round(self.duration_seconds, 2),
-            "findings_count": len(self.findings),
+            "findings_count": findings_count,
             "gate": {
                 "passed": self.gate.passed,
                 "reason": self.gate.reason,
@@ -72,6 +86,7 @@ class AssessmentResult:
                 "items": [_safe_asdict(item) for item in self.poam_items],
             },
             "authorization": _safe_asdict(self.authorization),
+            "vex_summary": self.vex_summary.to_dict(),
         }
 
 
@@ -90,6 +105,7 @@ def run_assessment(
     store: Any = None,
     phase: str | None = None,
     submitted_scanners: set[str] | None = None,
+    vex: dict[str, Any] | None = None,
 ) -> AssessmentResult:
     """Run gate + SP 800-30 + SAR + POA&M + authorization on a finding list."""
     t0 = time.monotonic()
@@ -97,19 +113,26 @@ def run_assessment(
     # Copy + tag so we don't mutate the caller's list.
     tagged = [_tagged(f, product) for f in findings]
 
+    # VEX triage. parse_vex_request raises ValueError on malformed input —
+    # let it bubble so the HTTP layer turns it into a 4xx.
+    vex_document = parse_vex_request(vex)
+    vex_summary = apply_vex(tagged, vex_document)
+    actionable = actionable_findings(tagged)
+
     tier = clients.assessor.categorize(manifest)
     controls = select_baseline(controls_repo, manifest, tier)
     mapper = ControlMapper(controls_repo)
 
-    enriched_vulns = _enrich_with_epss(tagged, manifest, mapper, clients)
+    enriched_vulns = _enrich_with_epss(actionable, manifest, mapper, clients)
 
     sp800_report = clients.pipeline.run(
-        findings=tagged,
+        findings=actionable,
         enriched_vulns=enriched_vulns,
         manifest=manifest,
         controls=controls,
         trigger=trigger,
         progress_callback=progress_callback,
+        vex_summary=vex_summary,
     )
 
     threshold_eval = ThresholdEvaluator(profile)
@@ -120,25 +143,25 @@ def run_assessment(
         "tier": tier.value,
         "frameworks": profile.frameworks,
         "findings_count": {
-            s: sum(1 for f in tagged if f.severity == s)
+            s: sum(1 for f in actionable if f.severity == s)
             for s in ["critical", "high", "medium", "low"]
         },
         "pci_scope_count": sum(
-            1 for f in tagged if any(c.startswith("PCI-DSS") for c in f.control_ids)
+            1 for f in actionable if any(c.startswith("PCI-DSS") for c in f.control_ids)
         ),
-        "secrets_count": sum(1 for f in tagged if is_secret_finding(f)),
+        "secrets_count": sum(1 for f in actionable if is_secret_finding(f)),
     }
-    gate = combined.evaluate(tagged, tier, context)
+    gate = combined.evaluate(actionable, tier, context)
 
     sar = SARGenerator(controls_repo).generate(
         product=product,
-        findings=tagged,
+        findings=actionable,
         gate_decision=gate,
         risk_report=sp800_report,
         submitted_scanners=submitted_scanners,
     )
     poam_items = POAMGenerator().generate(
-        findings=tagged,
+        findings=actionable,
         risk_report=sp800_report,
         gate_decision=gate,
         manifest=manifest,
@@ -191,6 +214,7 @@ def run_assessment(
         duration_seconds=time.monotonic() - t0,
         assessment_id=assessment_id,
         created_at=created_at,
+        vex_summary=vex_summary,
     )
 
     if store is not None:
@@ -257,6 +281,9 @@ def _tagged(finding: Finding, product: str) -> Finding:
         fixed_version=finding.fixed_version,
         cvss_score=finding.cvss_score,
         cwe_ids=list(finding.cwe_ids),
+        vex_status=finding.vex_status,
+        vex_justification=finding.vex_justification,
+        vex_detail=finding.vex_detail,
     )
 
 

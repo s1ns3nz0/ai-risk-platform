@@ -55,7 +55,7 @@ def validate_grounding(
     # Find all CVE references in AI output
     cve_pattern = re.compile(r"CVE-\d{4}-\d{4,}")
     ghsa_pattern = re.compile(r"GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}")
-    control_pattern = re.compile(r"(?:PCI-DSS-[\d.]+|ASVS-V[\d.]+|FISC-[実統設監]\d+|CMMC-[A-Z]{2}\.L\d-[\d.]+)")
+    control_pattern = re.compile(r"(?:PCI-DSS-[\d.]+|SOC2-(?:CC|C|PI)[\d.]+|ISO27001-A\.[\d.]+|CMMC-[A-Z]{2}\.L\d-[\d.]+)")
 
     referenced_cves = set(cve_pattern.findall(ai_text))
     referenced_ghsas = set(ghsa_pattern.findall(ai_text))

@@ -13,29 +13,21 @@
 # Data classification → required frameworks
 data_classifications:
   PCI:
-    frameworks: [pci-dss-4.0, asvs-4.0.3-L3]
-    description: "Payment card data — PCI DSS + application security baseline"
+    frameworks: [pci-dss-4.0, soc2-2017, iso27001]
+    description: "Payment card data — PCI DSS + SOC 2 + ISO 27001 (full assurance scope)"
   PII-financial:
-    frameworks: [asvs-4.0.3-L3]
-    description: "Financial personal data — application security baseline"
+    frameworks: [soc2-2017]
+    description: "Financial personal data — SOC 2 baseline"
   PII-general:
-    frameworks: [asvs-4.0.3-L3]
-    description: "Personal data — application security baseline"
+    frameworks: [soc2-2017]
+    description: "Personal data — SOC 2 baseline"
   PHI:
-    frameworks: [asvs-4.0.3-L3]
-    description: "Health data — application security baseline"
+    frameworks: [soc2-2017]
+    description: "Health data — SOC 2 baseline"
 
 # Jurisdiction → additional frameworks
-jurisdictions:
-  JP:
-    frameworks: [fisc-safety]
-    description: "Japan — FISC safety standards apply"
-  # EU:
-  #   frameworks: [gdpr]
-  #   description: "Europe — GDPR applies (future)"
-  # KR:
-  #   frameworks: [kisa]
-  #   description: "Korea — KISA standards apply (future)"
+# (Reserved for future region-specific frameworks, e.g. GDPR for EU.)
+jurisdictions: {}
 
 # Tier determination — based on number of distinct frameworks
 # More frameworks = higher compliance burden = higher tier

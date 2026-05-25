@@ -192,6 +192,7 @@ class StaticRiskAssessmentPipeline:
         controls: list[Control],
         trigger: str,
         progress_callback: object = None,
+        vex_summary: Any = None,
     ) -> SP80030Report:
         """Template-based SP 800-30 assessment."""
         # Dedup by (scanner, rule_id) so the SP 800-30 narrative reflects

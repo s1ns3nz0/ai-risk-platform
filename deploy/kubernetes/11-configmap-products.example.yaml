@@ -23,7 +23,7 @@ data:
         - PCI
         - PII-financial
       jurisdiction:
-        - JP
+        - US
       deployment:
         cloud: AWS
         region: ap-northeast-1
@@ -41,7 +41,7 @@ data:
     risk_profile:
       frameworks:
         - pci-dss-4.0
-        - asvs-4.0.3-L3
+        - soc2-2017
       risk_appetite: conservative
       thresholds:
         critical:

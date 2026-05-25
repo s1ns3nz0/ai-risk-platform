@@ -43,7 +43,7 @@ class ThreatScenario:
     impact: str
     likelihood: str  # "high" — based on EPSS + exposure
     severity: str  # "critical"
-    affected_controls: list[str]  # ["PCI-DSS-3.5.1", "ASVS-V3.5.3"]
+    affected_controls: list[str]  # ["PCI-DSS-3.5.1", "SOC2-CC6.3"]
     mitigation: str
 
 

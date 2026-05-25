@@ -15,7 +15,6 @@ _DATA_CLASSIFICATION_WEIGHT: dict[str, float] = {
 }
 
 _JURISDICTION_WEIGHT: dict[str, float] = {
-    "JP": 9.0,  # FISC
     "EU": 7.0,  # GDPR
 }
 _JURISDICTION_DEFAULT = 3.0

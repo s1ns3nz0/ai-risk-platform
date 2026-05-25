@@ -15,4 +15,4 @@ tags:
   - attack.brute_force
 control_ids:
   - PCI-DSS-10.2.1
-  - FISC-実127
+  - ISO27001-A.5.17

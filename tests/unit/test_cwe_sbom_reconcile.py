@@ -28,7 +28,7 @@ def _manifest() -> ProductManifest:
         name="payment-api",
         description="x",
         data_classification=["PCI"],
-        jurisdiction=["JP"],
+        jurisdiction=["US"],
         deployment={"cloud": "AWS"},
         impact_levels={"confidentiality": "high", "integrity": "high", "availability": "moderate"},
     )

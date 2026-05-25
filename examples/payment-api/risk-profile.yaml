@@ -1,8 +1,8 @@
 risk_profile:
   frameworks:
     - pci-dss-4.0
-    - asvs-4.0.3-L3
-    - fisc-safety
+    - soc2-2017
+    - iso27001
   risk_appetite: conservative
   thresholds:
     critical:

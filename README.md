@@ -5,7 +5,7 @@ Compliance-driven risk assessment engine for DevSecOps pipelines. Implements NIS
 ## What It Does
 
 - Runs 5 security scanners (Semgrep, Grype, Gitleaks, Checkov, ZAP)
-- Maps findings to compliance controls (SP 800-53, PCI DSS, ASVS, FISC)
+- Maps findings to compliance controls (SP 800-53, PCI DSS, SOC 2, ISO 27001)
 - Conducts SP 800-30 risk assessment (AI or static fallback)
 - Produces SAR, POA&M, and authorization decisions
 - Enforces gates via YAML thresholds + OPA/Rego policies

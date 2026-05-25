@@ -133,7 +133,7 @@ def test_all_high_cia_does_not_exceed_critical() -> None:
     manifest = _make_manifest(
         impact_levels={"confidentiality": "high", "integrity": "high", "availability": "high"},
         data_classification=["PCI", "PII-financial"],
-        jurisdiction=["JP"],
+        jurisdiction=["US"],
     )
     tier = assessor.categorize(manifest)
     assert tier == RiskTier.CRITICAL

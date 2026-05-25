@@ -1,0 +1,279 @@
+# ISO/IEC 27001:2022 Baseline Controls (Annex A)
+# Source: ISO/IEC 27001:2022 — Information security, cybersecurity and privacy protection
+# Reference: https://www.iso.org/standard/27001
+#
+# 2022 Annex A reorganized controls into 4 themes:
+#   A.5  — Organizational controls
+#   A.6  — People controls
+#   A.7  — Physical controls
+#   A.8  — Technological controls
+#
+# Only includes Annex A controls verifiable by automated scanners.
+# Items requiring procedural/physical verification are excluded.
+controls:
+
+  # ──────────────────────────────────────────────────────────
+  # A.5 Organizational controls — Access & identity
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "ISO27001-A.5.15"
+      title: "Access control"
+      framework: "iso27001"
+      description: "Rules to control physical and logical access to information and other associated assets shall be established and implemented based on business and information security requirements."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_1"
+            - "CKV_AWS_40"
+            - "CKV_AWS_46"
+            - "CKV_AWS_61"
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  - control:
+      id: "ISO27001-A.5.16"
+      title: "Identity management"
+      framework: "iso27001"
+      description: "The full life cycle of identities shall be managed."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_273"  # SSO access
+            - "CKV_AWS_62"   # No wildcard principal
+        - scanner: gitleaks
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  - control:
+      id: "ISO27001-A.5.17"
+      title: "Authentication information"
+      framework: "iso27001"
+      description: "Allocation and management of authentication information shall be controlled by a management process, including advising personnel on appropriate handling of authentication information."
+      verification_methods:
+        - scanner: gitleaks
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.audit.hardcoded-password.*"
+            - "generic.secrets.security.detected-generic-password.*"
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  - control:
+      id: "ISO27001-A.5.23"
+      title: "Information security for use of cloud services"
+      framework: "iso27001"
+      description: "Processes for acquisition, use, management and exit from cloud services shall be established in accordance with the organization's information security requirements."
+      verification_methods:
+        - scanner: checkov
+        - scanner: trivy
+          severity_threshold: high
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # A.8 Technological controls — Privileged access & secure operations
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "ISO27001-A.8.2"
+      title: "Privileged access rights"
+      framework: "iso27001"
+      description: "The allocation and use of privileged access rights shall be restricted and managed."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_46"   # No admin privileges
+            - "CKV_AWS_40"   # IAM via groups/roles
+            - "CKV_AWS_79"   # IMDSv2 required
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  - control:
+      id: "ISO27001-A.8.7"
+      title: "Protection against malware"
+      framework: "iso27001"
+      description: "Protection against malware shall be implemented and supported by appropriate user awareness."
+      verification_methods:
+        - scanner: grype
+          severity_threshold: high
+        - scanner: trivy
+          severity_threshold: high
+        - scanner: sbom
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  - control:
+      id: "ISO27001-A.8.8"
+      title: "Management of technical vulnerabilities"
+      framework: "iso27001"
+      description: "Information about technical vulnerabilities of information systems in use shall be obtained, the organization's exposure to such vulnerabilities evaluated, and appropriate measures taken."
+      verification_methods:
+        - scanner: grype
+          severity_threshold: high
+        - scanner: snyk
+        - scanner: sbom
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  - control:
+      id: "ISO27001-A.8.9"
+      title: "Configuration management"
+      framework: "iso27001"
+      description: "Configurations, including security configurations, of hardware, software, services and networks shall be established, documented, implemented, monitored and reviewed."
+      verification_methods:
+        - scanner: checkov
+        - scanner: hadolint
+        - scanner: kube-bench
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # A.8 — Logging, monitoring, network
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "ISO27001-A.8.15"
+      title: "Logging"
+      framework: "iso27001"
+      description: "Logs that record activities, exceptions, faults and other relevant events shall be produced, stored, protected and analysed."
+      verification_methods:
+        - scanner: sigma
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_67"   # CloudTrail in all regions
+            - "CKV_AWS_18"   # S3 access logging
+            - "CKV_AWS_150"  # VPC flow log
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  - control:
+      id: "ISO27001-A.8.16"
+      title: "Monitoring activities"
+      framework: "iso27001"
+      description: "Networks, systems and applications shall be monitored for anomalous behaviour and appropriate actions taken to evaluate potential information security incidents."
+      verification_methods:
+        - scanner: sigma
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_36"   # CloudTrail log file validation
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  - control:
+      id: "ISO27001-A.8.22"
+      title: "Segregation of networks"
+      framework: "iso27001"
+      description: "Groups of information services, users and information systems shall be segregated in the organization's networks."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_24"   # No 0.0.0.0/0 on port 22
+            - "CKV_AWS_25"   # No 0.0.0.0/0 on port 3389
+            - "CKV2_AWS_12"  # Default VPC removed
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  # ──────────────────────────────────────────────────────────
+  # A.8 — Cryptography & secure development
+  # ──────────────────────────────────────────────────────────
+
+  - control:
+      id: "ISO27001-A.8.24"
+      title: "Use of cryptography"
+      framework: "iso27001"
+      description: "Rules for the effective use of cryptography, including cryptographic key management, shall be defined and implemented."
+      verification_methods:
+        - scanner: checkov
+          check_ids:
+            - "CKV_AWS_19"   # S3 SSE
+            - "CKV_AWS_145"  # S3 KMS encryption
+        - scanner: semgrep
+          rules:
+            - "python.cryptography.security.*"
+            - "python.lang.security.audit.weak-hashing.*"
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  - control:
+      id: "ISO27001-A.8.25"
+      title: "Secure development life cycle"
+      framework: "iso27001"
+      description: "Rules for the secure development of software and systems shall be established and applied."
+      verification_methods:
+        - scanner: semgrep
+        - scanner: codeql
+        - scanner: spotbugs
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required
+
+  - control:
+      id: "ISO27001-A.8.28"
+      title: "Secure coding"
+      framework: "iso27001"
+      description: "Secure coding principles shall be applied to software development."
+      verification_methods:
+        - scanner: semgrep
+          rules:
+            - "python.lang.security.injection.*"
+            - "python.lang.security.audit.formatted-sql-query.*"
+        - scanner: bandit
+        - scanner: codeql
+      applicable_tiers: [critical]
+      risk_tier_mapping:
+        low: not-required
+        medium: not-required
+        high: not-required
+        critical: required

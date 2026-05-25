@@ -15,7 +15,7 @@ def _make_manifest() -> ProductManifest:
         name="payment-api",
         description="QR code payment confirmation service",
         data_classification=["PCI", "PII-financial"],
-        jurisdiction=["JP"],
+        jurisdiction=["US"],
         deployment={"cloud": "AWS", "compute": "EKS", "region": "ap-northeast-1"},
         integrations=["external-payment-gateway"],
     )
@@ -54,7 +54,7 @@ class TestCategorizationPromptIncludesManifest:
         assert "payment-api" in prompt
         assert "QR code payment confirmation service" in prompt
         assert "PCI" in prompt
-        assert "JP" in prompt
+        assert "US" in prompt
 
 
 class TestAssessmentPromptIncludesFindingsSummary:

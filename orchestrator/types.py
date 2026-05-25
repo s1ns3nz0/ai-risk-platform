@@ -62,6 +62,12 @@ class Finding:
     cvss_score: float | None = None
     # CWE references when the scanner emits them (Trivy.CweIDs, Grype.vulnerability.cwes).
     cwe_ids: list[str] = field(default_factory=list)
+    # VEX (CycloneDX VEX) triage status, populated by orchestrator.vex.apply_vex.
+    # "no_vex" until a VEX document is applied; thereafter one of the
+    # CycloneDX states: not_affected | affected | in_triage | fixed | under_investigation.
+    vex_status: str = "no_vex"
+    vex_justification: str = ""
+    vex_detail: str = ""
 
 
 def is_secret_finding(f: Finding) -> bool:

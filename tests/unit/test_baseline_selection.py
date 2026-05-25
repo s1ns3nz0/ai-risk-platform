@@ -25,9 +25,9 @@ class TestSelectBaseline:
     def test_payment_api_high_tier(self, repo: ControlsRepository, sample_manifest: ProductManifest) -> None:
         controls = select_baseline(repo, sample_manifest, RiskTier.HIGH)
         control_ids = {c.id for c in controls}
-        # PCI + ASVS controls should be selected for HIGH tier
+        # PCI + SOC 2 controls should be selected for HIGH tier
         assert any(cid.startswith("PCI-DSS") for cid in control_ids)
-        assert any(cid.startswith("ASVS") for cid in control_ids)
+        assert any(cid.startswith("SOC2-") for cid in control_ids)
         # All returned controls should apply to HIGH tier
         for c in controls:
             assert RiskTier.HIGH in c.applicable_tiers
@@ -41,7 +41,7 @@ class TestSelectBaseline:
             deployment={"cloud": "AWS", "compute": "EC2", "region": "us-east-1"},
             integrations=[],
         )
-        # MEDIUM tier → only ASVS frameworks per tier-mappings
+        # MEDIUM tier → only SOC 2 frameworks per tier-mappings
         controls = select_baseline(repo, manifest, RiskTier.MEDIUM)
         control_ids = {c.id for c in controls}
         assert not any(cid.startswith("PCI-DSS") for cid in control_ids)

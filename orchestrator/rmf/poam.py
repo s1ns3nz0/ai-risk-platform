@@ -67,10 +67,10 @@ _SCANNER_CONTROL_MAP: dict[str, list[str]] = {
 
 
 # Scanner → external framework references (DoD DevSecOps Tables, SSDF, CIS,
-# SP 800-204D, ASVS). Used as a fallback for source_detail.framework_refs.
+# SP 800-204D, SOC 2). Used as a fallback for source_detail.framework_refs.
 _SCANNER_FRAMEWORK_MAP: dict[str, list[str]] = {
     "hadolint": ["CIS Docker 4.x", "DoD Table 6", "SSDF PW.7.2"],
-    "zap":      ["DoD Table 7", "SSDF PW.8.2", "ASVS V5"],
+    "zap":      ["DoD Table 7", "SSDF PW.8.2", "SOC 2 CC6.1"],
     "grype":    ["DoD Table 6/7", "SSDF RV.1", "SP 800-204D §5.1.1"],
     "trivy":    ["DoD Table 7", "SSDF RV.1", "CIS Docker §4/§5"],
     "semgrep":  ["DoD Table 5/6", "SSDF PW.7", "SP 800-204D §5.1.3"],

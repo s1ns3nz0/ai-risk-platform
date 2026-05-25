@@ -18,7 +18,7 @@ def _make_manifest() -> ProductManifest:
         name="payment-api",
         description="QR code payment confirmation service",
         data_classification=["PCI", "PII-financial"],
-        jurisdiction=["JP"],
+        jurisdiction=["US"],
         deployment={"cloud": "AWS", "compute": "EKS", "region": "ap-northeast-1"},
         integrations=["external-payment-gateway"],
         impact_levels={
@@ -33,7 +33,7 @@ def _make_5_findings() -> list[dict[str, object]]:
     """5 selected findings in _step1_gather dict format."""
     base = [
         ("semgrep", "sql-injection", "critical", "src/api/export.py", 42,
-         "SQL injection via string concatenation", ["PCI-DSS-6.3.1", "ASVS-V5.3.4"]),
+         "SQL injection via string concatenation", ["PCI-DSS-6.3.1", "SOC2-CC8.1"]),
         ("gitleaks", "aws-access-key", "critical", "src/config.py", 10,
          "AWS access key detected", ["PCI-DSS-3.5.1"]),
         ("checkov", "CKV_AWS_19", "high", "terraform/s3.tf", 5,
@@ -41,7 +41,7 @@ def _make_5_findings() -> list[dict[str, object]]:
         ("grype", "CVE-2023-1234", "medium", "requirements.txt", 1,
          "Known vulnerability in requests", ["PCI-DSS-6.3.1"]),
         ("semgrep", "logging-sensitive-data", "medium", "src/api/auth.py", 15,
-         "Logging sensitive data", ["ASVS-V2.10.1"]),
+         "Logging sensitive data", ["SOC2-CC6.2"]),
     ]
     return [
         {
@@ -69,7 +69,7 @@ def _make_filtered(findings: list[dict[str, object]] | None = None) -> dict[str,
         "relevant_controls": [
             {"id": "PCI-DSS-6.3.1", "title": "Secure Software Development", "framework": "pci-dss-4.0"},
             {"id": "PCI-DSS-3.5.1", "title": "Protect Stored Account Data", "framework": "pci-dss-4.0"},
-            {"id": "ASVS-V5.3.4", "title": "Output Encoding", "framework": "asvs-5.0-L3"},
+            {"id": "SOC2-CC8.1", "title": "Output Encoding", "framework": "soc2-2017"},
         ],
         "manifest": _make_manifest(),
         "epss_map": {
@@ -84,8 +84,8 @@ def _make_filtered(findings: list[dict[str, object]] | None = None) -> dict[str,
              "framework": "pci-dss-4.0", "description": "Develop software securely"},
             {"id": "PCI-DSS-3.5.1", "title": "Protect Stored Account Data",
              "framework": "pci-dss-4.0", "description": "Protect stored account data"},
-            {"id": "ASVS-V5.3.4", "title": "Output Encoding",
-             "framework": "asvs-5.0-L3", "description": "Verify output encoding"},
+            {"id": "SOC2-CC8.1", "title": "Output Encoding",
+             "framework": "soc2-2017", "description": "Verify output encoding"},
         ],
     }
 

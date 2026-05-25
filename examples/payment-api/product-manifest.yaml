@@ -7,7 +7,7 @@ product:
     - PII-financial
 
   jurisdiction:
-    - JP
+    - US
 
   deployment:
     cloud: AWS
@@ -92,8 +92,8 @@ product:
         description: "Cardholder data (PAN, CVV) leaked to unauthorized party"
         business_impact: "PCI DSS compliance revocation, regulatory fine, customer trust loss, payment license suspension"
         estimated_cost: "$5M-50M"
-        affected_stakeholders: ["customers", "FSA-regulators", "payment-partner", "legal"]
-        regulatory_notification: "72 hours (PCI DSS), FISC incident reporting"
+        affected_stakeholders: ["customers", "PCI-QSA", "SOC2-auditor", "payment-partner", "legal"]
+        regulatory_notification: "72 hours (PCI DSS), SOC 2 incident reporting to assurance auditor"
 
       integrity_compromise:
         description: "Payment amounts or recipient accounts tampered"

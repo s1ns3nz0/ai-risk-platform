@@ -22,8 +22,11 @@ def repo() -> ControlsRepository:
 
 
 class TestLoadAll:
-    def test_loads_102_controls(self, repo: ControlsRepository) -> None:
-        assert len(repo.controls) == 102
+    def test_loads_all_controls(self, repo: ControlsRepository) -> None:
+        # PCI DSS 4.0 + SOC 2 + ISO 27001 baselines
+        assert len(repo.controls) > 0
+        frameworks = {c.framework for c in repo.controls.values()}
+        assert frameworks == {"pci-dss-4.0", "soc2-2017", "iso27001"}
 
     def test_controls_are_control_instances(self, repo: ControlsRepository) -> None:
         for control in repo.controls.values():
@@ -49,12 +52,12 @@ class TestGetControl:
 
 
 class TestGetBaselineForTier:
-    def test_high_tier_selects_pci_and_asvs(self, repo: ControlsRepository) -> None:
+    def test_high_tier_selects_pci_and_soc2(self, repo: ControlsRepository) -> None:
         controls = repo.get_baseline_for_tier(RiskTier.HIGH)
         frameworks = {c.framework for c in controls}
         assert "pci-dss-4.0" in frameworks
-        assert "asvs-4.0.3-L3" in frameworks
-        assert "fisc-safety" not in frameworks
+        assert "soc2-2017" in frameworks
+        assert "iso27001" not in frameworks
 
     def test_low_tier_returns_empty(self, repo: ControlsRepository) -> None:
         controls = repo.get_baseline_for_tier(RiskTier.LOW)
@@ -64,13 +67,13 @@ class TestGetBaselineForTier:
         controls = repo.get_baseline_for_tier(RiskTier.CRITICAL)
         frameworks = {c.framework for c in controls}
         assert "pci-dss-4.0" in frameworks
-        assert "asvs-4.0.3-L3" in frameworks
-        assert "fisc-safety" in frameworks
+        assert "soc2-2017" in frameworks
+        assert "iso27001" in frameworks
 
-    def test_medium_tier_selects_asvs_only(self, repo: ControlsRepository) -> None:
+    def test_medium_tier_selects_soc2_only(self, repo: ControlsRepository) -> None:
         controls = repo.get_baseline_for_tier(RiskTier.MEDIUM)
         frameworks = {c.framework for c in controls}
-        assert "asvs-4.0.3-L3" in frameworks
+        assert "soc2-2017" in frameworks
         assert "pci-dss-4.0" not in frameworks
 
 

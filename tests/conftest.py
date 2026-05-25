@@ -14,7 +14,7 @@ def sample_manifest() -> ProductManifest:
         name="payment-api",
         description="QR code payment confirmation service",
         data_classification=["PCI", "PII-financial"],
-        jurisdiction=["JP"],
+        jurisdiction=["US"],
         deployment={"cloud": "AWS", "compute": "EKS", "region": "ap-northeast-1"},
         integrations=["external-payment-gateway", "internal-user-db"],
     )
@@ -24,7 +24,7 @@ def sample_manifest() -> ProductManifest:
 def sample_profile() -> RiskProfile:
     """Conservative risk profile fixture."""
     return RiskProfile(
-        frameworks=["pci-dss-4.0", "asvs-4.0.3-L3", "fisc-safety"],
+        frameworks=["pci-dss-4.0", "soc2-2017", "iso27001"],
         risk_appetite="conservative",
         thresholds={
             "critical": {"max_critical_findings": 0, "max_secrets_detected": 0, "action": "block"},
@@ -51,7 +51,7 @@ def sample_finding() -> Finding:
         file="src/api/export.py",
         line=42,
         message="Possible SQL injection via string concatenation",
-        control_ids=["PCI-DSS-6.3.1", "ASVS-V5.3.4"],
+        control_ids=["PCI-DSS-6.3.1", "SOC2-CC8.1"],
         product="payment-api",
     )
 

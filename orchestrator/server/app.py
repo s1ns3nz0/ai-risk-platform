@@ -253,6 +253,14 @@ def create_app(
         if not findings:
             logger.info("assess: zero findings parsed for product=%s (clean scan)", name)
 
+        # Validate VEX shape early so a bad document yields 400, not 500.
+        if req.vex is not None:
+            from orchestrator.vex import parse_vex_request as _parse_vex
+            try:
+                _parse_vex(req.vex)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=f"invalid vex: {exc}") from exc
+
         # Distributed path: serialize a descriptor onto Redis. Any replica may execute.
         if isinstance(backend, RedisBackend) and req.async_mode:
             descriptor = {
@@ -262,6 +270,7 @@ def create_app(
                 "phase": req.phase,
                 "evidence_url": req.evidence_url,
                 "sbom": req.sbom,
+                "vex": req.vex,
                 "findings": [asdict(f) for f in findings],
                 "submitted_scanners": sorted(submitted_scanners),
             }
@@ -283,6 +292,7 @@ def create_app(
                 sbom=req.sbom,
                 store=state.store,
                 submitted_scanners=submitted_scanners,
+                vex=req.vex,
             )
         return _run_sync_or_async(_do, async_mode=req.async_mode, jobs=jobs)
 
@@ -526,6 +536,7 @@ def _build_handlers(state: ServerState) -> dict[str, Any]:
             sbom=descriptor.get("sbom"),
             store=state.store,
             submitted_scanners=set(submitted) if submitted else None,
+            vex=descriptor.get("vex"),
         )
 
     def scan_assess(descriptor: dict[str, Any]) -> AssessmentResult:

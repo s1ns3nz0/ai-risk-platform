@@ -134,6 +134,16 @@ class ImportAssessRequest(BaseModel):
             "`bom.json#components/pkg:maven/.../spring-core@6.1.6`."
         ),
     )
+    vex: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "Optional VEX (Vulnerability Exploitability eXchange) document. "
+            "Shape: {\"format\": \"cyclonedx\", \"document\": <CycloneDX 1.4+ VEX JSON>}. "
+            "Findings whose CVE/GHSA matches a `not_affected` analysis are "
+            "excluded from gate decisions, POA&M items, and severity counts; "
+            "the response surfaces `vex_summary` with the suppression rationale."
+        ),
+    )
 
 
 class ScanAssessRequest(BaseModel):
@@ -164,6 +174,9 @@ class AssessmentResponse(BaseModel):
     sar: dict[str, Any] | None
     poam: dict[str, Any]
     authorization: dict[str, Any] | None
+    # VEX triage summary. Always present; {"vex_provided": false} when the
+    # request omitted a VEX document.
+    vex_summary: dict[str, Any] = Field(default_factory=lambda: {"vex_provided": False})
 
 
 class ProductSummary(BaseModel):

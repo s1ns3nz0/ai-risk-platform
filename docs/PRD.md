@@ -21,7 +21,7 @@
 
 ### MVP-0 (먼저 구현, ~2,000 LOC)
 1. **Risk Assessment Engine** — 제품 카테고리화 + 리스크 스코어링 (RMF Step 2, 5)
-2. **Controls Repository** — OSCAL YAML 기반 컨트롤 카탈로그, tier별 baseline 자동 선택 (13 controls: PCI-DSS 6, ASVS 4, FISC 3)
+2. **Controls Repository** — OSCAL YAML 기반 컨트롤 카탈로그, tier별 baseline 자동 선택 (PCI-DSS + SOC 2 + ISO 27001)
 3. **IaC Policy Gate** — Checkov 스캔 + YAML threshold gate
 4. **SAST Integration** — Semgrep 스캔, Control ID 태깅
 5. **SCA Integration** — Grype 로컬 스캔, SBOM 기반 취약점 분석
@@ -61,7 +61,7 @@ AI는 static YAML mapping이 할 수 없는 **cross-signal reasoning**을 수행
 
 ## E2E 시나리오 (payment-api)
 1. Design-time risk assessment → AI가 제품 카테고리화, risk tier 결정
-2. Baseline selection → tier에 따라 PCI DSS + FISC + ASVS 컨트롤 자동 선택
+2. Baseline selection → tier에 따라 PCI DSS + SOC 2 + ISO 27001 컨트롤 자동 선택
 3. IaC scan → Checkov가 Terraform 스캔, threshold gate 평가
 4. SAST + SCA + Secrets → Semgrep + Grype + Gitleaks 실행, Control ID 태깅
 5. Pre-merge assessment → 모든 findings 종합, risk score 계산, gate 결정

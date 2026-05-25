@@ -92,7 +92,7 @@ class TestExportReport:
         """특정 control만 포함."""
         controls = [
             _make_control("PCI-DSS-6.3.1"),
-            _make_control("ASVS-V5.3.4", framework="asvs-4.0.3-L3"),
+            _make_control("SOC2-CC8.1", framework="soc2-2017"),
         ]
         exporter = _setup_exporter(
             tmp_path,
@@ -154,12 +154,12 @@ class TestCoverage:
         """coverage 계산 정확성."""
         controls = [
             _make_control("PCI-DSS-6.3.1", scanners=["semgrep"]),
-            _make_control("ASVS-V5.3.4", framework="asvs-4.0.3-L3", scanners=["semgrep"]),
-            _make_control("FISC-OP-1", framework="fisc-safety", scanners=["checkov"]),
+            _make_control("SOC2-CC8.1", framework="soc2-2017", scanners=["semgrep"]),
+            _make_control("ISO27001-A.5.15", framework="iso27001", scanners=["checkov"]),
         ]
         findings = [
             _make_finding(source="semgrep", control_ids=["PCI-DSS-6.3.1"]),
-            _make_finding(source="semgrep", control_ids=["ASVS-V5.3.4"]),
+            _make_finding(source="semgrep", control_ids=["SOC2-CC8.1"]),
         ]
         exporter = _setup_exporter(tmp_path, findings=findings, controls=controls)
 

@@ -135,12 +135,12 @@ def test_poam_has_milestones() -> None:
 def test_poam_links_to_control() -> None:
     """POA&M item should reference the control_id."""
     gen = POAMGenerator()
-    findings = [_make_finding(control_id="ASVS-V5.3.4")]
+    findings = [_make_finding(control_id="SOC2-CC8.1")]
 
     items = gen.generate(findings=findings)
 
     assert len(items) == 1
-    assert items[0].control_id == "ASVS-V5.3.4"
+    assert items[0].control_id == "SOC2-CC8.1"
     assert items[0].source == "semgrep"
     assert items[0].finding_id == "sql-injection"
 

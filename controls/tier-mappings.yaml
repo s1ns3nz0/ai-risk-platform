@@ -4,16 +4,16 @@ tier_mappings:
     description: "No compliance requirements"
   medium:
     frameworks:
-      - asvs-4.0.3-L3
-    description: "Application security baseline"
+      - soc2-2017
+    description: "SOC 2 trust services baseline"
   high:
     frameworks:
       - pci-dss-4.0
-      - asvs-4.0.3-L3
-    description: "Payment/financial data handling"
+      - soc2-2017
+    description: "Payment/financial data handling — PCI DSS + SOC 2"
   critical:
     frameworks:
       - pci-dss-4.0
-      - asvs-4.0.3-L3
-      - fisc-safety
-    description: "Regulated financial services in Japan"
+      - soc2-2017
+      - iso27001
+    description: "Regulated services — PCI DSS + SOC 2 + ISO 27001"

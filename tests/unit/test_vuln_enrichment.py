@@ -17,7 +17,7 @@ def _make_manifest(**overrides: object) -> ProductManifest:
         "name": "payment-api",
         "description": "QR payment service",
         "data_classification": ["PCI", "PII-financial"],
-        "jurisdiction": ["JP"],
+        "jurisdiction": ["US"],
         "deployment": {"type": "ecs", "environment": "production"},
         "integrations": [],
     }
@@ -125,12 +125,12 @@ class TestEnrichPreservesControlIds:
         self, enricher: VulnerabilityEnricher, epss_client: MagicMock
     ) -> None:
         epss_client.get_scores.return_value = {}
-        findings = [_make_finding(control_ids=["PCI-DSS-6.3.1", "ASVS-V14.2.1"])]
+        findings = [_make_finding(control_ids=["PCI-DSS-6.3.1", "SOC2-CC7.1"])]
         manifest = _make_manifest()
 
         result = enricher.enrich(findings, manifest)
 
-        assert result[0].control_ids == ["PCI-DSS-6.3.1", "ASVS-V14.2.1"]
+        assert result[0].control_ids == ["PCI-DSS-6.3.1", "SOC2-CC7.1"]
 
 
 class TestSortByPriority:

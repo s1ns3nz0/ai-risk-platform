@@ -128,7 +128,7 @@ class TestCheckovFindingHasControlIds:
 
         by_rule = {f.rule_id: f for f in findings}
         assert "PCI-DSS-3.5.1" in by_rule["CKV_AWS_19"].control_ids
-        assert "FISC-実119" in by_rule["CKV_AWS_19"].control_ids
+        assert "ISO27001-A.8.24" in by_rule["CKV_AWS_19"].control_ids
 
 
 class TestSemgrepParseOutput:
@@ -164,7 +164,7 @@ class TestSemgrepFindingHasControlIds:
         by_rule = {f.rule_id: f for f in findings}
         sqli = by_rule["python.lang.security.injection.sql-injection"]
         assert "PCI-DSS-6.3.1" in sqli.control_ids
-        assert "ASVS-V5.3.4" in sqli.control_ids
+        assert "SOC2-CC8.1" in sqli.control_ids
 
 
 class TestGrypeParseOutput:
@@ -206,7 +206,7 @@ class TestGrypeFindingHasControlIds:
         by_rule = {f.rule_id: f for f in findings}
         critical = by_rule["CVE-2023-50782"]
         assert "PCI-DSS-6.3.1" in critical.control_ids
-        assert "ASVS-V14.2.1" in critical.control_ids
+        assert "SOC2-CC7.1" in critical.control_ids
 
 
 class TestGitleaksParseOutput:
@@ -237,7 +237,7 @@ class TestGitleaksParseOutput:
 
         for f in findings:
             assert "PCI-DSS-3.6.1" in f.control_ids
-            assert "ASVS-V2.10.1" in f.control_ids
+            assert "SOC2-CC6.2" in f.control_ids
 
 
 class TestUnmappedRule:

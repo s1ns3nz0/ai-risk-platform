@@ -55,18 +55,20 @@ def _make_control(control_id: str = "PCI-DSS-6.3.1") -> Control:
 
 class TestCategorizePci:
     def test_categorize_pci(self) -> None:
+        # PCI maps to pci-dss-4.0 + soc2-2017 + iso27001 → 3 frameworks → CRITICAL
         assessor = StaticRiskAssessor()
         manifest = _make_manifest(data_classification=["PCI"])
         tier = assessor.categorize(manifest)
-        assert tier == RiskTier.HIGH
-
-
-class TestCategorizePciJp:
-    def test_categorize_pci_jp(self) -> None:
-        assessor = StaticRiskAssessor()
-        manifest = _make_manifest(data_classification=["PCI"], jurisdiction=["JP"])
-        tier = assessor.categorize(manifest)
         assert tier == RiskTier.CRITICAL
+
+
+class TestCategorizePiiFinancialOnly:
+    def test_categorize_pii_financial_only(self) -> None:
+        # PII-financial alone maps to soc2-2017 → 1 framework → MEDIUM
+        assessor = StaticRiskAssessor()
+        manifest = _make_manifest(data_classification=["PII-financial"])
+        tier = assessor.categorize(manifest)
+        assert tier == RiskTier.MEDIUM
 
 
 class TestCategorizePii:

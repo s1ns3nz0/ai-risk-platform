@@ -133,9 +133,9 @@ def sar() -> SecurityAssessmentReport:
                 risk_level="none",
             ),
             ControlAssessment(
-                control_id="FISC-実119",
+                control_id="ISO27001-A.8.24",
                 title="IaC security",
-                framework="FISC",
+                framework="ISO27001",
                 status="not-assessed",
                 evidence_type="none",
                 assessor="manual review required",

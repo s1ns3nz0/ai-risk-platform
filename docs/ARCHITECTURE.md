@@ -76,9 +76,9 @@ compliance-ai-risk-platform/
 │   └── architecture-design.md        # Full design document
 ├── controls/                          ← OSCAL YAML (핵심 폴더)
 │   ├── baselines/
-│   │   ├── pci-dss-4.0.yaml          # 6 controls (Sec 1, 3, 6, 10)
-│   │   ├── asvs-5.0-L3.yaml          # 4 controls (V2, V3, V5, V14)
-│   │   └── fisc-safety.yaml          # 3 controls
+│   │   ├── pci-dss-4.0.yaml          # PCI DSS 4.0 controls
+│   │   ├── soc2-2017.yaml            # SOC 2 Trust Services Criteria (CC6/CC7/CC8 + C1 + PI1)
+│   │   └── iso27001.yaml             # ISO/IEC 27001:2022 Annex A (A.5 + A.8)
 │   ├── products/
 │   │   └── payment-api/
 │   │       ├── product-manifest.yaml
@@ -159,7 +159,7 @@ Finding(
     severity="high",
     file="src/api/export.py",
     line=42,
-    control_ids=["PCI-DSS-6.3.1", "ASVS-V5.3.4"],  # ← 핵심
+    control_ids=["PCI-DSS-6.3.1", "SOC2-CC8.1"],  # ← 핵심
     product="payment-api"
 )
 ```

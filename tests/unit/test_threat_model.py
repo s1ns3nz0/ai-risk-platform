@@ -20,7 +20,7 @@ def _make_manifest(**overrides: object) -> ProductManifest:
         "name": "payment-api",
         "description": "QR payment service",
         "data_classification": ["PCI", "PII-financial"],
-        "jurisdiction": ["JP"],
+        "jurisdiction": ["US"],
         "deployment": {"cloud": "AWS", "compute": "EKS", "region": "ap-northeast-1"},
         "integrations": ["external-payment-gateway", "internal-user-db"],
     }
@@ -38,7 +38,7 @@ def _make_enriched_vuln(**overrides: object) -> EnrichedVulnerability:
         "installed_version": "1.7.1",
         "fixed_version": "2.4.0",
         "file_path": "requirements.txt",
-        "control_ids": ["ASVS-V3.5.3", "PCI-DSS-8.3.1"],
+        "control_ids": ["SOC2-CC6.3", "PCI-DSS-8.3.1"],
         "priority": "critical",
         "product_context": "payment-api, PCI scope",
         "data_classification": ["PCI", "PII-financial"],
@@ -113,7 +113,7 @@ class TestThreatScenarioHasMitre:
             impact="Full access to payment processing",
             likelihood="high",
             severity="critical",
-            affected_controls=["ASVS-V3.5.3", "PCI-DSS-8.3.1"],
+            affected_controls=["SOC2-CC6.3", "PCI-DSS-8.3.1"],
             mitigation="Upgrade PyJWT>=2.4.0",
         )
 
@@ -136,7 +136,7 @@ class TestStaticGeneratorFromVulns:
                 fixed_version="1.0.1",
                 severity="low",
                 priority="low",
-                control_ids=["ASVS-V14.2.1"],
+                control_ids=["SOC2-CC7.1"],
             ),
         ]
         controls = [_make_control()]
@@ -182,12 +182,12 @@ class TestControlsGapCalculated:
         manifest = _make_manifest()
         vulns = [
             _make_enriched_vuln(
-                control_ids=["ASVS-V3.5.3", "PCI-DSS-8.3.1"],
+                control_ids=["SOC2-CC6.3", "PCI-DSS-8.3.1"],
             ),
         ]
         controls = [
             _make_control(id="PCI-DSS-6.3.1"),
-            _make_control(id="ASVS-V3.5.3"),
+            _make_control(id="SOC2-CC6.3"),
         ]
 
         model = generator.generate(
@@ -201,7 +201,7 @@ class TestControlsGapCalculated:
         # controls_covered comes from the controls list ids
         # controls_gap = required - covered
         assert "PCI-DSS-8.3.1" in model.controls_gap
-        assert "ASVS-V3.5.3" not in model.controls_gap
+        assert "SOC2-CC6.3" not in model.controls_gap
 
 
 class TestOutputYamlFormat:

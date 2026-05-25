@@ -16,4 +16,4 @@ tags:
   - attack.t1078
   - attack.privilege_escalation
 control_ids:
-  - FISC-実121
+  - ISO27001-A.5.15
