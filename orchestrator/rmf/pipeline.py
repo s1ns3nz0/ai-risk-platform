@@ -215,15 +215,22 @@ class RiskAssessmentPipeline:
         controls: list[Control],
         trigger: str,
         progress_callback: Callable[[int, int, str], None] | None = None,
+        vex_summary: Any = None,
     ) -> SP80030Report:
         """Full SP 800-30 assessment pipeline.
 
         Falls back to static pipeline on any AI error.
+
+        `vex_summary` is a `VexSummary` (or None). When supplied, its
+        suppression counts and justifications are surfaced to the
+        synthesis prompt so the executive narrative explains why N CVEs
+        were excluded from the actionable set.
         """
         try:
             gathered = self._step1_gather(
                 findings, enriched_vulns, manifest, controls, trigger,
             )
+            gathered["vex_summary"] = vex_summary
             filtered = self._step2_filter(gathered)
             assessment = self._step3_assess(filtered, progress_callback=progress_callback)
             responses = self._step4_respond(assessment)
@@ -261,6 +268,7 @@ class RiskAssessmentPipeline:
                 manifest=manifest,
                 controls=controls,
                 trigger=trigger,
+                vex_summary=vex_summary,
             )
 
     def _step1_gather(
@@ -289,6 +297,9 @@ class RiskAssessmentPipeline:
                 "package": f.package,
                 "installed_version": f.installed_version,
                 "fixed_version": f.fixed_version,
+                "vex_status": f.vex_status,
+                "vex_justification": f.vex_justification,
+                "vex_detail": f.vex_detail,
             }
             for i, f in enumerate(unique)
         ]
@@ -380,6 +391,7 @@ class RiskAssessmentPipeline:
             manifest=filtered["manifest"],
             total_findings=filtered.get("n_findings", len(all_findings)),
             severity_counts=severity_counts,
+            vex_summary=filtered.get("vex_summary"),
         )
 
         # Collect SP 800-30 components from per-finding results
@@ -532,10 +544,14 @@ class RiskAssessmentPipeline:
                 finding_index=finding_index,
             )
 
+            # 16384 covers full SP 800-30 JSON (threat_source, threat_event,
+            # likelihood, impact, risk_determination, risk_response, narrative).
+            # Previously 4096, which truncated long evidence/business_impact
+            # fields mid-sentence (see "signifi"-style cutoffs in TE descriptions).
             response_text = self._bedrock.stream_with_cache(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
-                max_tokens=4096,
+                max_tokens=16384,
             )
             parsed = _extract_json(response_text)
             parsed["mode"] = "ai"
@@ -649,6 +665,7 @@ class RiskAssessmentPipeline:
         manifest: ProductManifest,
         total_findings: int,
         severity_counts: dict[str, int],
+        vex_summary: Any = None,
     ) -> dict[str, Any]:
         """Generate executive summary + cross-signal insights from all per-finding results."""
         if not self._bedrock or all(r.get("mode") == "static" for r in per_finding_results):
@@ -660,12 +677,15 @@ class RiskAssessmentPipeline:
                 per_finding_results=per_finding_results,
                 total_findings=total_findings,
                 severity_counts=severity_counts,
+                vex_summary=vex_summary,
             )
 
+            # Summary synthesizes across every per-finding result and emits
+            # executive_summary + recommendations — needs the same 16384 headroom.
             response_text = self._bedrock.stream_with_cache(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
-                max_tokens=4096,
+                max_tokens=16384,
             )
             return _extract_json(response_text)
 

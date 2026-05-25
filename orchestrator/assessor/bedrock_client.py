@@ -22,6 +22,32 @@ class BedrockRateLimitError(BedrockInvocationError):
     """Raised when local rate limit is exceeded."""
 
 
+class BedrockTruncatedResponseError(BedrockInvocationError):
+    """Raised when Bedrock stops generation because ``max_tokens`` was hit.
+
+    SP 800-30 reports contain long-form text fields (threat event
+    descriptions, impact narratives, executive summaries). When Claude's
+    output is cut at ``max_tokens`` the resulting JSON is either invalid or,
+    worse, valid-but-truncated mid-sentence — which silently produces
+    incomplete reports. Surface the truncation explicitly so callers can
+    retry with a higher ceiling or fall back to the static path.
+    """
+
+
+def _raise_if_truncated(stop_reason: str | None, max_tokens: int) -> None:
+    """Raise BedrockTruncatedResponseError when Claude stops at max_tokens.
+
+    Otherwise the truncated text (often cut mid-word) flows into SP 800-30
+    fields like ThreatEvent.description and is silently persisted.
+    """
+    if stop_reason == "max_tokens":
+        raise BedrockTruncatedResponseError(
+            f"Bedrock truncated response at max_tokens={max_tokens}. "
+            "SP 800-30 text fields would be incomplete — raise max_tokens "
+            "or shorten input. Caller will fall back to static assessment."
+        )
+
+
 class BedrockClient:
     """boto3 bedrock-runtime wrapper.
 
@@ -71,7 +97,7 @@ class BedrockClient:
             )
         _invocation_timestamps.append(now)
 
-    def invoke(self, prompt: str, max_tokens: int = 4096) -> str:
+    def invoke(self, prompt: str, max_tokens: int = 16384) -> str:
         """Invoke Bedrock WITHOUT prompt caching (simple single-message call).
 
         Use invoke_with_cache() for cost-optimized calls with cacheable system prompts.
@@ -99,6 +125,8 @@ class BedrockClient:
             response_body = json.loads(response["body"].read())
             self._log_response(response_body, elapsed, cached=False)
 
+            _raise_if_truncated(response_body.get("stop_reason"), max_tokens)
+
             return response_body["content"][0]["text"]  # type: ignore[no-any-return]
 
         except (BedrockInvocationError, BedrockRateLimitError):
@@ -110,7 +138,7 @@ class BedrockClient:
         self,
         system_prompt: str,
         user_prompt: str,
-        max_tokens: int = 4096,
+        max_tokens: int = 16384,
     ) -> str:
         """Invoke Bedrock WITH prompt caching.
 
@@ -154,6 +182,8 @@ class BedrockClient:
             response_body = json.loads(response["body"].read())
             self._log_response(response_body, elapsed, cached=True)
 
+            _raise_if_truncated(response_body.get("stop_reason"), max_tokens)
+
             return response_body["content"][0]["text"]  # type: ignore[no-any-return]
 
         except (BedrockInvocationError, BedrockRateLimitError):
@@ -165,7 +195,7 @@ class BedrockClient:
         self,
         system_prompt: str,
         user_prompt: str,
-        max_tokens: int = 4096,
+        max_tokens: int = 16384,
     ) -> str:
         """Invoke Bedrock WITH prompt caching AND streaming.
 
@@ -204,6 +234,7 @@ class BedrockClient:
             # Accumulate text from streaming chunks
             accumulated_text = ""
             output_tokens = 0
+            stop_reason: str | None = None
 
             for event in response["body"]:
                 chunk_bytes = event.get("chunk", {}).get("bytes")
@@ -217,6 +248,9 @@ class BedrockClient:
                     if delta.get("type") == "text_delta":
                         accumulated_text += delta.get("text", "")
                 elif chunk_type == "message_delta":
+                    delta = chunk_data.get("delta", {})
+                    if delta.get("stop_reason"):
+                        stop_reason = delta["stop_reason"]
                     usage = chunk_data.get("usage", {})
                     output_tokens = usage.get("output_tokens", output_tokens)
 
@@ -227,6 +261,8 @@ class BedrockClient:
                 "usage": {"output_tokens": output_tokens},
             }
             self._log_response(response_body, elapsed, cached=True)
+
+            _raise_if_truncated(stop_reason, max_tokens)
 
             return accumulated_text
 

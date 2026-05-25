@@ -12,6 +12,7 @@ from orchestrator.assessor.bedrock_client import (
     BedrockClient,
     BedrockInvocationError,
     BedrockRateLimitError,
+    BedrockTruncatedResponseError,
     _invocation_timestamps,
 )
 
@@ -33,6 +34,14 @@ def _make_message_stop_chunk(output_tokens: int = 100) -> dict:
     return _make_chunk({
         "type": "message_delta",
         "delta": {"stop_reason": "end_turn"},
+        "usage": {"output_tokens": output_tokens},
+    })
+
+
+def _make_max_tokens_stop_chunk(output_tokens: int = 16384) -> dict:
+    return _make_chunk({
+        "type": "message_delta",
+        "delta": {"stop_reason": "max_tokens"},
         "usage": {"output_tokens": output_tokens},
     })
 
@@ -133,6 +142,63 @@ class TestStreamWithCacheWrapsExceptions:
                 system_prompt="system",
                 user_prompt="user",
             )
+
+
+class TestStreamWithCacheDetectsTruncation:
+    def test_max_tokens_stop_reason_raises(self, mock_boto3_client: MagicMock):
+        """Streaming chunks with stop_reason=max_tokens must raise.
+
+        SP 800-30 reports silently lose text-field completeness when Claude
+        hits max_tokens. The streaming loop must surface this so the per-finding
+        caller can fall back to the static assessor instead of persisting a
+        report with descriptions cut mid-sentence.
+        """
+        chunks = [
+            _make_text_chunk('{"threat_event": {"description": "signifi'),
+            _make_max_tokens_stop_chunk(16384),
+        ]
+        mock_boto3_client.invoke_model_with_response_stream.return_value = {
+            "body": iter(chunks),
+        }
+
+        bc = BedrockClient(model_id="us.anthropic.claude-sonnet-4-6-20250514-v1:0", region="us-west-2")
+
+        with pytest.raises(BedrockTruncatedResponseError, match="max_tokens=16384"):
+            bc.stream_with_cache(
+                system_prompt="system",
+                user_prompt="user",
+            )
+
+    def test_end_turn_stop_reason_returns_normally(self, mock_boto3_client: MagicMock):
+        """stop_reason=end_turn is the healthy path — must not raise."""
+        chunks = [
+            _make_text_chunk("complete response"),
+            _make_message_stop_chunk(200),
+        ]
+        mock_boto3_client.invoke_model_with_response_stream.return_value = {
+            "body": iter(chunks),
+        }
+
+        bc = BedrockClient(model_id="us.anthropic.claude-sonnet-4-6-20250514-v1:0", region="us-west-2")
+        result = bc.stream_with_cache(system_prompt="s", user_prompt="u")
+
+        assert result == "complete response"
+
+
+class TestStreamWithCacheDefaultMaxTokens:
+    def test_default_max_tokens_is_16384(self, mock_boto3_client: MagicMock):
+        """Default max_tokens raised from 4096 → 16384 to fit full SP 800-30 JSON."""
+        chunks = [_make_text_chunk("ok"), _make_message_stop_chunk()]
+        mock_boto3_client.invoke_model_with_response_stream.return_value = {
+            "body": iter(chunks),
+        }
+
+        bc = BedrockClient(model_id="us.anthropic.claude-sonnet-4-6-20250514-v1:0", region="us-west-2")
+        bc.stream_with_cache(system_prompt="s", user_prompt="u")
+
+        call_kwargs = mock_boto3_client.invoke_model_with_response_stream.call_args[1]
+        body = json.loads(call_kwargs["body"])
+        assert body["max_tokens"] == 16384
 
 
 class TestStreamWithCacheLogsTiming:
