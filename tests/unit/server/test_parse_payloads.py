@@ -133,3 +133,65 @@ def test_clean_kube_bench_credits_scanner_with_zero_findings():
     findings, submitted = _parse_payloads(payloads, state)
     assert findings == []
     assert "kube-bench" in submitted
+
+
+def test_cosign_verified_credits_scanner_with_zero_findings():
+    """A fully-verified cosign bundle yields zero findings but must still
+    register 'cosign' in submitted_scanners — that's what lets the SAR mark
+    supply-chain integrity controls as satisfied instead of not-assessed."""
+    state = _FakeState()
+    payloads = [ScannerResultPayload(
+        scanner="cosign",
+        content={
+            "verifications": [
+                {"subject": "img@sha256:a", "type": "image-signature", "verified": True},
+                {"subject": "img@sha256:a", "type": "attestation",
+                 "attestation_type": "cyclonedx", "verified": True},
+            ]
+        },
+    )]
+    findings, submitted = _parse_payloads(payloads, state)
+    assert findings == []
+    assert "cosign" in submitted
+
+
+def test_cosign_attestation_alias_routes_to_cosign():
+    """The cosign-attestation alias must collapse to canonical cosign."""
+    state = _FakeState()
+    payloads = [ScannerResultPayload(
+        scanner="cosign-attestation",
+        content={"verifications": [
+            {"subject": "img", "type": "attestation", "verified": False, "error": "missing"},
+        ]},
+    )]
+    findings, submitted = _parse_payloads(payloads, state)
+    assert "cosign" in submitted
+    assert len(findings) == 1
+    assert findings[0].source == "cosign"
+
+
+def test_gatekeeper_alias_routes_to_opa_admission():
+    """Gatekeeper / Kyverno engines collapse onto canonical opa-admission."""
+    state = _FakeState()
+    payloads = [ScannerResultPayload(
+        scanner="gatekeeper",
+        content={"violations": [
+            {"policy": "p", "engine": "gatekeeper", "message": "v"},
+        ]},
+    )]
+    findings, submitted = _parse_payloads(payloads, state)
+    assert "opa-admission" in submitted
+    assert len(findings) == 1
+    assert findings[0].source == "opa-admission"
+
+
+def test_opa_admission_clean_credits_scanner():
+    """Zero admission violations is the satisfied path — must credit the scanner."""
+    state = _FakeState()
+    payloads = [ScannerResultPayload(
+        scanner="opa-admission",
+        content={"violations": []},
+    )]
+    findings, submitted = _parse_payloads(payloads, state)
+    assert findings == []
+    assert "opa-admission" in submitted

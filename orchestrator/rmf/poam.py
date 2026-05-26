@@ -34,10 +34,14 @@ _SCAN_TYPE: dict[str, str] = {
     "zap": "DAST",
     "kube-bench": "CIS",   # CIS Kubernetes Benchmark — runtime hardening
     "cis-java":   "CIS",   # CIS Java Runtime Environment Benchmark
+    "cosign": "Supply-Chain",       # Sigstore signature + attestation verify
+    "opa-admission": "Admission",   # Gatekeeper / Kyverno violations
     "sarif": "SAST",  # SARIF is universal — default to SAST for unclassified
 }
 
 # Trigger → DevSecOps phase. The CI POSTs `trigger`; map it to BUILD/TEST/DEPLOY.
+# DELIVER/RELEASE are not derivable from trigger alone — CIs must pass
+# `phase` explicitly when posting a deliver-phase bundle.
 _PHASE: dict[str, str] = {
     "pre_merge": "BUILD",
     "pre_deploy": "DEPLOY",
@@ -63,6 +67,9 @@ _SCANNER_CONTROL_MAP: dict[str, list[str]] = {
     "snyk":     ["RA-5", "SI-2", "SR-3"],
     "kube-bench": ["CM-6", "SI-7"],     # k8s runtime hardening + integrity
     "cis-java":   ["CM-6", "SC-13"],    # JRE config + crypto
+    # Deliver-phase supply-chain + admission controls
+    "cosign":        ["SI-7", "SR-3", "SR-4", "SR-11", "SA-12"],  # integrity + supply chain
+    "opa-admission": ["CM-5", "CM-6", "AC-3", "AC-6"],            # change control + config + RBAC
 }
 
 
@@ -82,6 +89,8 @@ _SCANNER_FRAMEWORK_MAP: dict[str, list[str]] = {
     "snyk":     ["DoD Table 6/7", "SSDF RV.1"],
     "kube-bench": ["CIS Kubernetes 1.10", "DoD Table 10", "SSDF PW.9"],
     "cis-java":   ["CIS Java JRE", "DoD Table 6", "SSDF PW.9"],
+    "cosign":        ["SLSA v1.0", "Sigstore", "SSDF PS.2", "SP 800-204D §4.3"],
+    "opa-admission": ["DoD Table 9/10", "SSDF PW.9", "CIS Kubernetes 5.x"],
 }
 
 

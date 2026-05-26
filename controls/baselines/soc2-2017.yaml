@@ -76,6 +76,9 @@ controls:
             - "CKV_AWS_24"   # No ingress from 0.0.0.0/0 to port 22
             - "CKV_AWS_25"   # No ingress from 0.0.0.0/0 to port 3389
             - "CKV2_AWS_12"  # Default VPC does not exist
+        # Admission policy blocks workloads that bypass the network policy
+        # (host network, privileged ports, missing NetworkPolicy).
+        - scanner: opa-admission
       applicable_tiers: [medium, high, critical]
       risk_tier_mapping:
         low: not-required
@@ -114,6 +117,10 @@ controls:
         - scanner: trivy
           severity_threshold: high
         - scanner: sbom
+        # Deliver-phase: only signed images verified against the org's
+        # trust root are permitted to run.
+        - scanner: cosign
+        - scanner: opa-admission
       applicable_tiers: [medium, high, critical]
       risk_tier_mapping:
         low: not-required
@@ -194,6 +201,10 @@ controls:
             - "python.lang.security.injection.*"
         - scanner: checkov
         - scanner: hadolint
+        # Deliver-phase: every change reaches prod via a signed image and
+        # an admission policy that gates the rollout.
+        - scanner: cosign
+        - scanner: opa-admission
       applicable_tiers: [medium, high, critical]
       risk_tier_mapping:
         low: not-required

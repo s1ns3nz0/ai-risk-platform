@@ -613,6 +613,15 @@ _SCANNER_ALIASES: dict[str, str] = {
     # parser polymorphically; the raw XML upload form gets its own alias
     # so callers can be explicit.
     "spotbugs-xml": "spotbugs",
+    # Deliver-phase verification scanners (Phase A — supply chain integrity
+    # + admission policy). Inputs are normalized result bundles posted by
+    # the CI's deliver job, not raw cosign/Gatekeeper CLI output.
+    "cosign-verify": "cosign",
+    "cosign-attestation": "cosign",
+    "sigstore": "cosign",
+    "gatekeeper": "opa-admission",
+    "kyverno": "opa-admission",
+    "admission-policy": "opa-admission",
 }
 
 
@@ -793,6 +802,12 @@ def _parse_inline(scanner: str, raw: str, mapper: ControlMapper) -> list[Finding
         # string path is handled in _parse_one_entry before _parse_inline runs.
         from orchestrator.parsers.sarif import parse_sarif
         return parse_sarif(raw, mapper)
+    if scanner == "cosign":
+        from orchestrator.scanners.cosign import CosignScanner
+        return CosignScanner(mapper).parse_output(raw)
+    if scanner == "opa-admission":
+        from orchestrator.scanners.opa_admission import OpaAdmissionScanner
+        return OpaAdmissionScanner(mapper).parse_output(raw)
     return []
 
 

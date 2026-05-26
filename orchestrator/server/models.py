@@ -82,6 +82,11 @@ class ScannerResultPayload(BaseModel):
             # line becomes a Finding; PASS lines credit the control via the
             # submitted-scanners set.
             "kube-bench", "cis-java",
+            # Deliver-phase verification (Phase A — supply-chain integrity
+            # + admission policy). Inputs are normalized result bundles
+            # posted by the CI's deliver/release job.
+            "cosign", "cosign-verify", "cosign-attestation", "sigstore",
+            "opa-admission", "gatekeeper", "kyverno", "admission-policy",
         }
         if v not in allowed:
             raise ValueError(f"scanner must be one of {sorted(allowed)}")

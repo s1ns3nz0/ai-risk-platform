@@ -153,6 +153,10 @@ controls:
         - scanner: checkov
         - scanner: hadolint
         - scanner: kube-bench
+        # Cluster-side admission gate (Gatekeeper / Kyverno) enforces the
+        # configuration baseline at rollout time, catching drift checkov
+        # alone can't see (manual kubectl patches, missing labels, etc.).
+        - scanner: opa-admission
       applicable_tiers: [critical]
       risk_tier_mapping:
         low: not-required
@@ -236,6 +240,8 @@ controls:
           rules:
             - "python.cryptography.security.*"
             - "python.lang.security.audit.weak-hashing.*"
+        # KMS-backed signing key for artifact signatures — verified via cosign.
+        - scanner: cosign
       applicable_tiers: [critical]
       risk_tier_mapping:
         low: not-required
@@ -252,6 +258,10 @@ controls:
         - scanner: semgrep
         - scanner: codeql
         - scanner: spotbugs
+        # Build artifacts must be signed (Sigstore) and carry attestations
+        # for their build provenance (SLSA) so the SDLC is end-to-end
+        # verifiable, not just verifiable at source.
+        - scanner: cosign
       applicable_tiers: [critical]
       risk_tier_mapping:
         low: not-required

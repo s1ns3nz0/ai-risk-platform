@@ -425,6 +425,9 @@ controls:
         - scanner: sbom
         - scanner: grype
           severity_threshold: high
+        # Each release ships with a signed SBOM attestation — cosign
+        # verifies the inventory is the one that was actually built.
+        - scanner: cosign
       applicable_tiers: [high, critical]
       risk_tier_mapping:
         low: not-required
@@ -441,6 +444,10 @@ controls:
         - scanner: grype
           severity_threshold: high
         - scanner: sbom
+        # Admission policy refuses to roll out images whose digest doesn't
+        # match the patched-and-signed artifact published by the build job.
+        - scanner: cosign
+        - scanner: opa-admission
       applicable_tiers: [high, critical]
       risk_tier_mapping:
         low: not-required
@@ -462,6 +469,9 @@ controls:
           check_ids:
             - "CKV_AWS_40"   # Ensure IAM policies are attached only to groups or roles
             - "CKV_AWS_1"    # Ensure IAM policies are not applied to individual users
+        # Admission policy enforces the deny-all default on the cluster
+        # (no privileged pods, no wildcard RBAC, no host-namespace access).
+        - scanner: opa-admission
       applicable_tiers: [high, critical]
       risk_tier_mapping:
         low: not-required
