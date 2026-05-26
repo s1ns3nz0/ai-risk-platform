@@ -544,14 +544,15 @@ class RiskAssessmentPipeline:
                 finding_index=finding_index,
             )
 
-            # 16384 covers full SP 800-30 JSON (threat_source, threat_event,
-            # likelihood, impact, risk_determination, risk_response, narrative).
-            # Previously 4096, which truncated long evidence/business_impact
-            # fields mid-sentence (see "signifi"-style cutoffs in TE descriptions).
+            # 32768 covers full SP 800-30 JSON (threat_source, threat_event,
+            # likelihood, impact, risk_determination, risk_response, narrative)
+            # with safety margin for verbose evidence/business_impact narratives.
+            # Previously 4096 then 16384 — both still cut long fields mid-word
+            # (e.g. ThreatEvent.description ending at "parent sessi").
             response_text = self._bedrock.stream_with_cache(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
-                max_tokens=16384,
+                max_tokens=32768,
             )
             parsed = _extract_json(response_text)
             parsed["mode"] = "ai"
@@ -681,11 +682,11 @@ class RiskAssessmentPipeline:
             )
 
             # Summary synthesizes across every per-finding result and emits
-            # executive_summary + recommendations — needs the same 16384 headroom.
+            # executive_summary + recommendations — needs the same 32768 headroom.
             response_text = self._bedrock.stream_with_cache(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
-                max_tokens=16384,
+                max_tokens=32768,
             )
             return _extract_json(response_text)
 

@@ -97,7 +97,7 @@ class BedrockClient:
             )
         _invocation_timestamps.append(now)
 
-    def invoke(self, prompt: str, max_tokens: int = 16384) -> str:
+    def invoke(self, prompt: str, max_tokens: int = 32768) -> str:
         """Invoke Bedrock WITHOUT prompt caching (simple single-message call).
 
         Use invoke_with_cache() for cost-optimized calls with cacheable system prompts.
@@ -138,7 +138,7 @@ class BedrockClient:
         self,
         system_prompt: str,
         user_prompt: str,
-        max_tokens: int = 16384,
+        max_tokens: int = 32768,
     ) -> str:
         """Invoke Bedrock WITH prompt caching.
 
@@ -195,7 +195,7 @@ class BedrockClient:
         self,
         system_prompt: str,
         user_prompt: str,
-        max_tokens: int = 16384,
+        max_tokens: int = 32768,
     ) -> str:
         """Invoke Bedrock WITH prompt caching AND streaming.
 

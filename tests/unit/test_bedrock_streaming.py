@@ -38,7 +38,7 @@ def _make_message_stop_chunk(output_tokens: int = 100) -> dict:
     })
 
 
-def _make_max_tokens_stop_chunk(output_tokens: int = 16384) -> dict:
+def _make_max_tokens_stop_chunk(output_tokens: int = 32768) -> dict:
     return _make_chunk({
         "type": "message_delta",
         "delta": {"stop_reason": "max_tokens"},
@@ -155,7 +155,7 @@ class TestStreamWithCacheDetectsTruncation:
         """
         chunks = [
             _make_text_chunk('{"threat_event": {"description": "signifi'),
-            _make_max_tokens_stop_chunk(16384),
+            _make_max_tokens_stop_chunk(32768),
         ]
         mock_boto3_client.invoke_model_with_response_stream.return_value = {
             "body": iter(chunks),
@@ -163,7 +163,7 @@ class TestStreamWithCacheDetectsTruncation:
 
         bc = BedrockClient(model_id="us.anthropic.claude-sonnet-4-6-20250514-v1:0", region="us-west-2")
 
-        with pytest.raises(BedrockTruncatedResponseError, match="max_tokens=16384"):
+        with pytest.raises(BedrockTruncatedResponseError, match="max_tokens=32768"):
             bc.stream_with_cache(
                 system_prompt="system",
                 user_prompt="user",
@@ -186,8 +186,8 @@ class TestStreamWithCacheDetectsTruncation:
 
 
 class TestStreamWithCacheDefaultMaxTokens:
-    def test_default_max_tokens_is_16384(self, mock_boto3_client: MagicMock):
-        """Default max_tokens raised from 4096 → 16384 to fit full SP 800-30 JSON."""
+    def test_default_max_tokens_is_32768(self, mock_boto3_client: MagicMock):
+        """Default max_tokens raised 4096 → 16384 → 32768 to fit full SP 800-30 JSON."""
         chunks = [_make_text_chunk("ok"), _make_message_stop_chunk()]
         mock_boto3_client.invoke_model_with_response_stream.return_value = {
             "body": iter(chunks),
@@ -198,7 +198,7 @@ class TestStreamWithCacheDefaultMaxTokens:
 
         call_kwargs = mock_boto3_client.invoke_model_with_response_stream.call_args[1]
         body = json.loads(call_kwargs["body"])
-        assert body["max_tokens"] == 16384
+        assert body["max_tokens"] == 32768
 
 
 class TestStreamWithCacheLogsTiming:
