@@ -412,6 +412,150 @@ def test_sar_report_id_format() -> None:
         gate_decision=_make_gate_decision(passed=True),
     )
 
+
+# --- Phase-scoped coverage ---
+
+
+def _three_phase_repo() -> ControlsRepository:
+    """Repo with one BUILD-only, one DELIVER-only, and one mixed control.
+
+    Exercised by the phase-scoped coverage tests below.
+    """
+    build_only = _make_control(
+        control_id="X-BUILD-1", title="SAST", scanner="semgrep",
+    )
+    deliver_only = _make_control(
+        control_id="X-DELIVER-1", title="Image signature", scanner="cosign",
+    )
+    mixed = Control(
+        id="X-MIXED-1",
+        title="Change management",
+        framework="custom",
+        description="Verified in BUILD (SAST) and DELIVER (cosign)",
+        verification_methods=[
+            VerificationMethod(scanner="semgrep"),
+            VerificationMethod(scanner="cosign"),
+        ],
+        applicable_tiers=[RiskTier.CRITICAL, RiskTier.HIGH],
+    )
+    return _mini_repo_with_controls([build_only, deliver_only, mixed])
+
+
+def test_deliver_phase_excludes_build_only_controls_from_denominator() -> None:
+    """The original bug — DELIVER coverage was crushed because BUILD-only
+    controls were counted as 'not-assessed' in the DELIVER SAR. With
+    phase scoping, the BUILD-only control is `not-applicable`/out-of-phase
+    and does not appear in the coverage denominator.
+    """
+    repo = _three_phase_repo()
+    gen = SARGenerator(repo)
+
+    sar = gen.generate(
+        product="payment-api",
+        findings=[],
+        gate_decision=_make_gate_decision(passed=True),
+        submitted_scanners={"cosign"},   # only the DELIVER scanner ran
+        phase="DELIVER",
+    )
+
+    # Denominator = 2 (DELIVER-only + mixed). BUILD-only is excluded.
+    assert sar.total_controls == 2
+    # Both in-phase controls are 'satisfied' because cosign ran with zero findings.
+    assert sar.satisfied == 2
+    assert sar.coverage_percentage == 100.0
+
+    # The BUILD-only control is still in the assessment list for traceability,
+    # but flagged so the dashboard can hide it.
+    by_id = {a.control_id: a for a in sar.control_assessments}
+    assert by_id["X-BUILD-1"].status == "not-applicable"
+    assert by_id["X-BUILD-1"].evidence_type == "out-of-phase"
+
+
+def test_build_phase_excludes_deliver_only_controls() -> None:
+    """Symmetric — a BUILD SAR shouldn't be punished for not running cosign."""
+    repo = _three_phase_repo()
+    gen = SARGenerator(repo)
+
+    sar = gen.generate(
+        product="payment-api",
+        findings=[],
+        gate_decision=_make_gate_decision(passed=True),
+        submitted_scanners={"semgrep"},
+        phase="BUILD",
+    )
+
+    # Denominator = 2 (BUILD-only + mixed). DELIVER-only is excluded.
+    assert sar.total_controls == 2
+    assert sar.satisfied == 2
+    assert sar.coverage_percentage == 100.0
+
+
+def test_phase_none_preserves_legacy_whole_baseline_coverage() -> None:
+    """When no phase is supplied, behaviour is unchanged (regression guard)."""
+    repo = _three_phase_repo()
+    gen = SARGenerator(repo)
+
+    sar = gen.generate(
+        product="payment-api",
+        findings=[],
+        gate_decision=_make_gate_decision(passed=True),
+        submitted_scanners={"cosign"},
+        # phase omitted
+    )
+
+    # All three controls in the denominator. Only the cosign-verifiable two
+    # are satisfied. The BUILD-only control falls back to "not-assessed".
+    assert sar.total_controls == 3
+    assert sar.satisfied == 2
+    assert sar.not_assessed == 1
+
+
+def test_phase_is_case_insensitive() -> None:
+    repo = _three_phase_repo()
+    gen = SARGenerator(repo)
+
+    sar_lower = gen.generate(
+        product="payment-api",
+        findings=[],
+        gate_decision=_make_gate_decision(passed=True),
+        submitted_scanners={"cosign"},
+        phase="deliver",
+    )
+    assert sar_lower.total_controls == 2
+
+
+def test_deliver_phase_with_violation_marks_other_than_satisfied() -> None:
+    """A cosign verification failure must produce 'other-than-satisfied' on
+    the deliver-mapped controls, not just disappear into the noise."""
+    repo = _three_phase_repo()
+    gen = SARGenerator(repo)
+
+    # Tag the cosign finding with both DELIVER-mapped controls so the
+    # mapper-free path is exercised.
+    finding = Finding(
+        source="cosign",
+        rule_id="cosign.signature.missing",
+        severity="high",
+        file="ghcr.io/acme/api@sha256:bad",
+        line=0,
+        message="cosign verification failed",
+        control_ids=["X-DELIVER-1", "X-MIXED-1"],
+        product="payment-api",
+    )
+
+    sar = gen.generate(
+        product="payment-api",
+        findings=[finding],
+        gate_decision=_make_gate_decision(passed=False),
+        submitted_scanners={"cosign"},
+        phase="DELIVER",
+    )
+
+    assert sar.total_controls == 2
+    assert sar.other_than_satisfied == 2
+    assert sar.satisfied == 0
+    assert sar.coverage_percentage == 0.0
+
     assert sar.report_id.startswith("SAR-")
     parts = sar.report_id.split("-")
     assert len(parts) == 4

@@ -15,6 +15,71 @@ from orchestrator.rmf.models import SP80030Report
 from orchestrator.types import Finding, GateDecision
 
 
+# Scanner → DevSecOps phase. A control belongs to a phase iff at least one
+# of its verification_methods has a scanner registered for that phase.
+# Used to scope SAR coverage to controls actually verifiable in the phase
+# under assessment — without this, a DELIVER-phase SAR includes every
+# SAST/SCA control in the denominator and coverage gets crushed by
+# "not-assessed" entries that BUILD owns, not DELIVER.
+_SCANNER_PHASES: dict[str, set[str]] = {
+    # DEVELOP — pre-commit / pre-push checks
+    "gitleaks":      {"DEVELOP", "BUILD"},
+    # BUILD — code analysis on the source tree + IaC
+    "semgrep":       {"BUILD"},
+    "bandit":        {"BUILD"},
+    "codeql":        {"BUILD"},
+    "spotbugs":      {"BUILD"},
+    "sarif":         {"BUILD"},  # generic SARIF defaults here
+    "checkov":       {"BUILD"},
+    "hadolint":      {"BUILD"},
+    "sbom":          {"BUILD", "RELEASE"},
+    # TEST — running-app analysis
+    "zap":           {"TEST"},
+    # RELEASE — built-artifact / image scans
+    "grype":         {"RELEASE"},
+    "trivy":         {"RELEASE"},
+    "snyk":          {"RELEASE"},
+    "kube-bench":    {"RELEASE", "DEPLOY"},
+    "cis-java":      {"RELEASE"},
+    # DELIVER — supply-chain integrity + cluster admission gate
+    "cosign":        {"DELIVER"},
+    "opa-admission": {"DELIVER", "DEPLOY"},
+    # OPERATE — runtime detection
+    "sigma":         {"OPERATE"},
+}
+
+
+def control_phases(control: Control) -> set[str]:
+    """Phases in which a control is verifiable, based on its scanners.
+
+    A control with no verification_methods belongs to no phase (manual only),
+    so it's never counted in a phase-scoped SAR denominator.
+    """
+    phases: set[str] = set()
+    for vm in control.verification_methods:
+        phases.update(_SCANNER_PHASES.get(vm.scanner, set()))
+    return phases
+
+
+def _out_of_phase_assessment(control: "Control", phase: str) -> "ControlAssessment":
+    """Stub assessment for controls that don't apply to the current phase.
+
+    Kept in the assessments list for traceability but excluded from
+    coverage math. Dashboards can filter on `evidence_type=="out-of-phase"`.
+    """
+    return ControlAssessment(
+        control_id=control.id,
+        title=control.title,
+        framework=control.framework,
+        status="not-applicable",
+        evidence_type="out-of-phase",
+        assessor=f"verified in another phase (not {phase})",
+        findings_count=0,
+        findings_summary=f"Control is not in scope for the {phase} phase",
+        risk_level="n/a",
+    )
+
+
 @dataclass
 class ControlAssessment:
     """Per-control assessment status (RMF Step 5)."""
@@ -77,6 +142,7 @@ class SARGenerator:
         gate_decision: GateDecision,
         risk_report: SP80030Report | None = None,
         submitted_scanners: set[str] | None = None,
+        phase: str | None = None,
     ) -> SecurityAssessmentReport:
         """Generate SAR.
 
@@ -85,6 +151,16 @@ class SARGenerator:
         control as 'satisfied'). When None, falls back to inferring from
         finding sources — appropriate for in-process scan-mode where only
         scanners that produced findings are observed.
+
+        `phase` (DEVELOP / BUILD / TEST / RELEASE / DELIVER / DEPLOY /
+        OPERATE) scopes the denominator. When supplied, only controls
+        verifiable in that phase contribute to total_controls and
+        coverage_percentage — so a DELIVER-phase assessment is judged
+        on deliver-time controls (cosign, opa-admission) rather than on
+        the union of every SAST/SCA/DAST control in the baseline. Per-
+        control assessments outside the phase are still included in
+        `control_assessments` for traceability but flagged
+        `evidence_type="out-of-phase"` so the dashboard can hide them.
         """
         now = datetime.now(timezone.utc)
         report_id = f"SAR-{now.strftime('%Y')}-{now.strftime('%m%d')}-001"
@@ -100,19 +176,33 @@ class SARGenerator:
             for cid in f.control_ids:
                 control_findings.setdefault(cid, []).append(f)
 
-        # Assess each control
+        normalized_phase = (phase or "").upper() or None
+
+        # Assess each control. When phase-scoping is enabled, controls that
+        # don't belong to this phase are demoted to "out-of-phase" so they
+        # neither inflate "not-assessed" nor sink the coverage ratio.
         assessments: list[ControlAssessment] = []
+        in_phase_assessments: list[ControlAssessment] = []
         for control_id, control in self._controls.controls.items():
             ctrl_findings = control_findings.get(control_id, [])
+            if normalized_phase is not None:
+                ctrl_phases = control_phases(control)
+                if ctrl_phases and normalized_phase not in ctrl_phases:
+                    assessments.append(_out_of_phase_assessment(control, normalized_phase))
+                    continue
             assessment = self._assess_control(
                 control, ctrl_findings, scanners_that_ran,
             )
             assessments.append(assessment)
+            in_phase_assessments.append(assessment)
 
-        satisfied = sum(1 for a in assessments if a.status == "satisfied")
-        other_than_satisfied = sum(1 for a in assessments if a.status == "other-than-satisfied")
-        not_assessed = sum(1 for a in assessments if a.status == "not-assessed")
-        total = len(assessments)
+        # Coverage is computed over the phase-relevant slice when phase
+        # scoping is on; otherwise over everything (legacy behaviour).
+        scoring_set = in_phase_assessments if normalized_phase else assessments
+        satisfied = sum(1 for a in scoring_set if a.status == "satisfied")
+        other_than_satisfied = sum(1 for a in scoring_set if a.status == "other-than-satisfied")
+        not_assessed = sum(1 for a in scoring_set if a.status == "not-assessed")
+        total = len(scoring_set)
         coverage = round(satisfied / total * 100, 1) if total > 0 else 0.0
 
         # Authorization recommendation from gate decision

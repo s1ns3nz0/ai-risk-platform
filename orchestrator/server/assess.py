@@ -159,6 +159,11 @@ def run_assessment(
         gate_decision=gate,
         risk_report=sp800_report,
         submitted_scanners=submitted_scanners,
+        # Phase-scoped coverage: a DELIVER-phase POST is judged on deliver-time
+        # controls only, not on the union of every SAST/SCA control in the
+        # baseline. Without this, deliver coverage gets crushed by "not-
+        # assessed" entries that BUILD owns, not DELIVER.
+        phase=phase,
     )
     poam_items = POAMGenerator().generate(
         findings=actionable,
